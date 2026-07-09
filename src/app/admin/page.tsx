@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getDb } from "@/lib/supabase";
 import { Channel } from "@/lib/types";
 import { addChannel, deleteChannel, toggleChannel } from "./actions";
+import { logout } from "./login/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,14 @@ export default async function AdminPage({ searchParams }: Props) {
 
   return (
     <div className="mt-8">
-      <h1 className="text-2xl font-extrabold">Админ</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-extrabold">Админ</h1>
+        <form action={logout}>
+          <button className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-muted transition hover:text-foreground">
+            Гарах
+          </button>
+        </form>
+      </div>
 
       {ok && <p className="mt-4 rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-400">{ok}</p>}
       {error && <p className="mt-4 rounded-lg bg-red-500/10 px-4 py-2 text-sm text-red-400">{error}</p>}

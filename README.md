@@ -42,7 +42,7 @@ npm run dev
 
 ### 4. Суваг нэмээд контент татах
 
-1. `http://localhost:3000/admin` руу орж (Basic auth: `admin` / `ADMIN_PASSWORD`) суваг нэмнэ. `@handle`, `UC...` id, эсвэл сувгийн URL аль нь ч болно.
+1. `http://localhost:3000/admin` руу орж (нэвтрэх нэр: `admin`, нууц үг: `ADMIN_PASSWORD`) суваг нэмнэ. `@handle`, `UC...` id, эсвэл сувгийн URL аль нь ч болно.
 2. Ingestion worker ажиллуулна:
 
 ```bash

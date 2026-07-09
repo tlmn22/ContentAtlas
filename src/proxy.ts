@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ADMIN_SESSION_COOKIE, computeSessionToken } from "@/lib/admin-auth";
 
 /**
- * HTTP Basic auth for /admin (username: admin, password: ADMIN_PASSWORD).
+ * Cookie-session auth for /admin. /admin/login itself stays public so the
+ * login form and its server action are reachable.
  */
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const password = process.env.ADMIN_PASSWORD;
   if (!password) {
     return new NextResponse("ADMIN_PASSWORD тохируулагдаагүй тул /admin хаалттай байна.", {
@@ -11,22 +13,13 @@ export function proxy(req: NextRequest) {
     });
   }
 
-  const auth = req.headers.get("authorization");
-  if (auth?.startsWith("Basic ")) {
-    try {
-      const [user, pass] = atob(auth.slice(6)).split(":");
-      if (user === "admin" && pass === password) return NextResponse.next();
-    } catch {
-      // fall through to 401
-    }
-  }
+  const cookie = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  const expected = await computeSessionToken(password);
+  if (cookie === expected) return NextResponse.next();
 
-  return new NextResponse("Нэвтрэх шаардлагатай.", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="admin", charset="UTF-8"' },
-  });
+  return NextResponse.redirect(new URL("/admin/login", req.url));
 }
 
 export const config = {
-  matcher: "/admin/:path*",
+  matcher: ["/admin", "/admin/((?!login).*)"],
 };
