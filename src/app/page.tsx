@@ -1,65 +1,90 @@
-import Image from "next/image";
+import Link from "next/link";
+import MovieRow from "@/components/MovieRow";
+import Section from "@/components/Section";
+import { getGenres, getLatestMovies, getMoviesByGenre, getPopularMovies } from "@/lib/queries";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+const HOME_GENRE_IDS = [28, 35, 27, 18, 878, 10749];
+
+async function loadHome() {
+  const genres = await getGenres();
+  const homeGenres = HOME_GENRE_IDS.map((id) => genres.find((g) => g.id === id)).filter(
+    (g) => g !== undefined
+  );
+  const [latest, popular, genreRows] = await Promise.all([
+    getLatestMovies(15),
+    getPopularMovies(15),
+    Promise.all(
+      homeGenres.map((g) => getMoviesByGenre(g.id, 15).then((movies) => ({ genre: g, movies })))
+    ),
+  ]);
+  return { latest, popular, genreRows };
+}
+
+export default async function HomePage() {
+  let data: Awaited<ReturnType<typeof loadHome>>;
+  try {
+    data = await loadHome();
+  } catch {
+    return (
+      <div className="py-24 text-center">
+        <h1 className="text-xl font-bold">Тохиргоо дутуу байна</h1>
+        <p className="mt-3 text-muted">
+          Өгөгдлийн сантай холбогдож чадсангүй. <code>.env.local</code> файлд Supabase түлхүүрүүдээ
+          тохируулаад, <code>supabase/migrations</code> доторх schema-г ажиллуулна уу.
+        </p>
+      </div>
+    );
+  }
+
+  const { latest, popular, genreRows } = data;
+  const isEmpty = latest.length === 0 && popular.length === 0;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div>
+      <div className="mt-8 rounded-2xl bg-gradient-to-r from-surface to-background p-6 ring-1 ring-white/5 sm:p-10">
+        <h1 className="max-w-2xl text-2xl font-extrabold leading-tight sm:text-3xl">
+          Кино тайлбарын нэгдсэн сан
+        </h1>
+        <p className="mt-2 max-w-xl text-sm text-muted sm:text-base">
+          Монголын шилдэг кино тайлбар сувгуудын бичлэгүүдийг нэг дороос — жанр, он, нэрээр нь хайж
+          олоорой.
+        </p>
+      </div>
+
+      {isEmpty ? (
+        <div className="py-20 text-center text-muted">
+          <p>Одоогоор контент алга. Ingestion worker ажиллуулсны дараа кинонууд энд гарч ирнэ.</p>
+          <p className="mt-2 text-sm">
+            <Link href="/admin" className="text-accent hover:underline">
+              /admin
+            </Link>{" "}
+            хуудсаар суваг нэмээд <code>npm run ingest</code> ажиллуулна уу.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      ) : (
+        <>
+          {latest.length > 0 && (
+            <Section title="Шинэ нэмэгдсэн" href="/hailt">
+              <MovieRow movies={latest} />
+            </Section>
+          )}
+          {popular.length > 0 && (
+            <Section title="Их үзэлттэй">
+              <MovieRow movies={popular} />
+            </Section>
+          )}
+          {genreRows.map(
+            ({ genre, movies }) =>
+              movies.length > 0 && (
+                <Section key={genre.id} title={genre.name_mn} href={`/hailt?genre=${genre.id}`}>
+                  <MovieRow movies={movies} />
+                </Section>
+              )
+          )}
+        </>
+      )}
     </div>
   );
 }

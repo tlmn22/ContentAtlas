@@ -1,0 +1,19 @@
+# Vercel Hobby cron runs at most once a day, so GitHub Actions handles
+# the 4x/day schedule by calling the deployed cron endpoint.
+# Repo secrets needed: SITE_URL (https://... deployment), CRON_SECRET.
+name: Ingest videos
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call ingest endpoint
+        run: |
+          curl --fail --silent --show-error --max-time 290 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.SITE_URL }}/api/cron/ingest"

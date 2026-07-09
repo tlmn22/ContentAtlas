@@ -1,36 +1,102 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Кино Сан — Кино Recap Aggregator
 
-## Getting Started
+Монголын YouTube дээрх кино тайлбар (recap) сувгуудын бичлэгүүдийг нэг дор цуглуулж, кино сайт шиг цэгцтэй үзүүлдэг платформ. Бичлэгүүд YouTube embed-ээр тоглоно — видео хостинг хийхгүй.
 
-First, run the development server:
+## Стек
+
+- **Next.js** (App Router, TypeScript, SSR) + **Tailwind CSS**
+- **Supabase** (PostgreSQL)
+- **YouTube Data API v3** (quota хэмнэлттэй `playlistItems` endpoint)
+- **TMDB API** (кино метадата)
+- **Vercel** хостинг + **GitHub Actions** cron
+
+## Анх удаа тохируулах
+
+### 1. Орчны хувьсагчид
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Дараах түлхүүрүүдийг бөглөнө:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Хувьсагч | Хаанаас авах |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API |
+| `YOUTUBE_API_KEY` | Google Cloud Console → YouTube Data API v3 идэвхжүүлж API key үүсгэх |
+| `TMDB_API_TOKEN` | themoviedb.org → Settings → API → **API Read Access Token** (v4) |
+| `CRON_SECRET` | Санамсаргүй урт тэмдэгт мөр (`openssl rand -hex 32`) |
+| `ADMIN_PASSWORD` | `/admin` хуудасны нууц үг (хэрэглэгчийн нэр: `admin`) |
+| `NEXT_PUBLIC_SITE_URL` | Deploy хийсэн домэйн (SEO/sitemap-д хэрэглэнэ) |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 2. Өгөгдлийн сангийн schema
 
-## Learn More
+Supabase Dashboard → SQL Editor дээр [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) файлын агуулгыг бүхэлд нь ажиллуулна. (Эсвэл Supabase CLI: `supabase db push`.)
 
-To learn more about Next.js, take a look at the following resources:
+### 3. Ажиллуулах
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm install
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 4. Суваг нэмээд контент татах
 
-## Deploy on Vercel
+1. `http://localhost:3000/admin` руу орж (Basic auth: `admin` / `ADMIN_PASSWORD`) суваг нэмнэ. `@handle`, `UC...` id, эсвэл сувгийн URL аль нь ч болно.
+2. Ingestion worker ажиллуулна:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run ingest              # бүх идэвхтэй сувгийг sync хийнэ
+npm run ingest -- UCxxxxxx  # нэг сувгийг sync хийнэ
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Анхны sync нь сувгийн бүх бичлэгийг татаж, гарчгаас нь кино нэр/оныг ялгаад TMDB-ээс автоматаар тааруулна. Таараагүй бичлэгүүдийг `/admin/unmatched` дээр гараар холбоно.
+
+## Архитектур
+
+```
+src/
+  lib/
+    youtube.ts        YouTube Data API (playlistItems=1 unit, search хэрэглэдэггүй)
+    tmdb.ts           TMDB хайлт + метадата
+    title-parser.ts   Бичлэгийн гарчгаас кино нэр/он ялгах heuristic
+    matcher.ts        TMDB тааруулалт + оноожуулалт (threshold=4), movie upsert
+    ingest.ts         Sync логик: шинэ бичлэг, availability sweep
+    queries.ts        Хуудсуудын өгөгдөл татах функцууд
+  app/
+    page.tsx              Нүүр (шинэ, их үзэлттэй, жанрын мөрүүд)
+    kino/[slug]/          Кино хуудас (embed тоглуулагч, SEO meta, JSON-LD)
+    suvag/, suvag/[id]/   Сувгийн жагсаалт ба хуудас
+    hailt/                Хайлт (нэр, жанр, он)
+    admin/                Суваг удирдах, таараагүй бичлэг холбох
+    api/cron/ingest/      Cron endpoint (Bearer CRON_SECRET)
+scripts/ingest.ts     CLI worker (npm run ingest)
+supabase/migrations/  Schema
+```
+
+### Өгөгдлийн загвар
+
+`channels` → `videos` (N:1) → `movies` (N:1, nullable) → `movie_genres` → `genres`. Нэг кино олон сувгийн олон recap бичлэгтэй байж болно. Ирээдүйд кино бус контент нэмэхэд зориулж `categories` / `video_categories` хүснэгтүүд бэлэн.
+
+### Тааруулалтын урсгал
+
+1. Гарчгийг цэвэрлэнэ (кино тайлбар, recap, emoji, hashtag г.м. хог үгсийг хасна)
+2. Латин үсэгтэй хэсэг, «хашилтад» бичсэн нэр, он (жишээ нь `(2019)`) -ыг ялгана
+3. TMDB-ээс хайж, нэрийн ижилслэл + оны тохирол + нэр хүндээр оноожуулна
+4. Оноо хангалттай бол `auto` статустай холбоно, үгүй бол `unmatched` үлдээж admin гараар холбоно
+
+## Deploy (Vercel)
+
+1. GitHub repo үүсгэж push хийнэ, Vercel дээр import хийнэ
+2. Environment Variables хэсэгт `.env.local`-ын бүх утгыг оруулна
+3. `vercel.json` доторх cron өдөрт 1 удаа ажиллана (Hobby план дээр өдөрт 1 л удаа зөвшөөрдөг). Өдөрт 4 удаа шалгахын тулд GitHub repo-ийн Settings → Secrets дээр `SITE_URL`, `CRON_SECRET` нэмбэл [.github/workflows/ingest.yml](.github/workflows/ingest.yml) 6 цаг тутам endpoint-ийг дуудна.
+
+## Quota тооцоо
+
+YouTube API өдөрт 10,000 unit өгдөг. Суваг бүрийн шинэ бичлэг шалгахад ~1-2 unit, идэвхтэй бичлэгүүдийн availability sweep 50 бичлэг тутамд 1 unit. 20 суваг × 500 бичлэг × 4 удаа/өдөр ≈ 900 unit — хангалттай багтана.
+
+## Дараагийн үе шат (MVP-д ороогүй)
+
+- Хэрэглэгчийн бүртгэл, дуртай жагсаалт, сэтгэгдэл
+- Кино бус категориуд (түүх, шинжлэх ухаан...) — schema бэлэн, UI хийгдээгүй
+- Тааруулалтыг Claude API-аар сайжруулах (одоо regex + heuristic)
