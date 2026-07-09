@@ -15,15 +15,15 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Кино Сан — Кино тайлбарын нэгдсэн сан",
-    template: "%s | Кино Сан",
+    default: "Kino Hub — Кино тайлбарын нэгдсэн сан",
+    template: "%s | Kino Hub",
   },
   description:
     "Монгол хэл дээрх кино тайлбар бичлэгүүдийг нэг дороос. Жанр, он, нэрээр хайж дуртай киногоо олоорой.",
   openGraph: {
     type: "website",
     locale: "mn_MN",
-    siteName: "Кино Сан",
+    siteName: "Kino Hub",
   },
 };
 
@@ -39,8 +39,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="sticky top-0 z-40 border-b border-white/5 bg-background/90 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
             <Link href="/" className="flex shrink-0 items-center gap-2 font-extrabold tracking-tight">
-              <span className="rounded bg-accent px-1.5 py-0.5 text-sm text-black">КИНО</span>
-              <span className="text-lg">САН</span>
+              <span className="rounded bg-accent px-1.5 py-0.5 text-sm text-black">KINO</span>
+              <span className="text-lg">HUB</span>
             </Link>
             <div className="flex-1" />
             <SearchBar />
@@ -60,7 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Бүх бичлэг YouTube дээрх эх сувгаасаа шууд тоглоно. Контентын эрх нь тухайн сувгийн
             эзэнд хамаарна.
           </p>
-          <p className="mt-2">Кино мэдээлэл: TMDB · © {new Date().getFullYear()} Кино Сан</p>
+          <p className="mt-2">Кино мэдээлэл: TMDB · © {new Date().getFullYear()} Kino Hub</p>
         </footer>
       </body>
     </html>

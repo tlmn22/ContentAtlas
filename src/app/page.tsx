@@ -1,5 +1,6 @@
 import Link from "next/link";
 import MovieRow from "@/components/MovieRow";
+import MovieSearchForm from "@/components/MovieSearchForm";
 import Section from "@/components/Section";
 import { getGenres, getLatestMovies, getMoviesByGenre, getPopularMovies } from "@/lib/queries";
 
@@ -19,7 +20,7 @@ async function loadHome() {
       homeGenres.map((g) => getMoviesByGenre(g.id, 15).then((movies) => ({ genre: g, movies })))
     ),
   ]);
-  return { latest, popular, genreRows };
+  return { genres, latest, popular, genreRows };
 }
 
 export default async function HomePage() {
@@ -38,7 +39,7 @@ export default async function HomePage() {
     );
   }
 
-  const { latest, popular, genreRows } = data;
+  const { genres, latest, popular, genreRows } = data;
   const isEmpty = latest.length === 0 && popular.length === 0;
 
   return (
@@ -52,6 +53,12 @@ export default async function HomePage() {
           олоорой.
         </p>
       </div>
+
+      {genres.length > 0 && (
+        <div className="mt-6">
+          <MovieSearchForm genres={genres} />
+        </div>
+      )}
 
       {isEmpty ? (
         <div className="py-20 text-center text-muted">

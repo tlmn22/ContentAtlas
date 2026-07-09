@@ -148,3 +148,33 @@ export async function ingestAll(db: SupabaseClient): Promise<ChannelSyncResult[]
   }
   return results;
 }
+
+/**
+ * Retry TMDB matching for videos still stuck as "unmatched" - useful after
+ * fixing TMDB_API_TOKEN or improving the matcher, since a normal sync only
+ * ever attempts matching once, on first ingest.
+ */
+export async function rematchUnmatched(db: SupabaseClient): Promise<{ matched: number; total: number }> {
+  const { data: videos, error } = await db
+    .from("videos")
+    .select("id, title")
+    .eq("match_status", "unmatched")
+    .eq("is_available", true);
+  if (error) throw error;
+
+  let matched = 0;
+  for (const v of videos ?? []) {
+    try {
+      const match = await findMovieForTitle(v.title);
+      if (match) {
+        const movieId = await ensureMovie(db, match.movie, match.titleMn);
+        await db.from("videos").update({ movie_id: movieId, match_status: "auto" }).eq("id", v.id);
+        matched++;
+      }
+    } catch (err) {
+      console.error(`Rematch failed for ${v.id} "${v.title}":`, err);
+    }
+    await sleep(100);
+  }
+  return { matched, total: videos?.length ?? 0 };
+}
