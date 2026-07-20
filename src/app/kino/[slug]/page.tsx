@@ -45,6 +45,8 @@ export default async function MoviePage({ params, searchParams }: Props) {
   const genres = movie.movie_genres.map((mg) => mg.genres).filter(Boolean);
   const activeVideo = movie.videos.find((video) => video.id === v) ?? movie.videos[0];
   const name = movie.title_mn ?? movie.title;
+  // movie.videos is already ordered by view_count desc, so the first item is the most-viewed.
+  const [topVideo, ...otherVideos] = movie.videos;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -120,13 +122,29 @@ export default async function MoviePage({ params, searchParams }: Props) {
               className="h-full w-full"
             />
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-            <span className="font-medium text-foreground">{activeVideo.title}</span>
-            <Link href={`/suvag/${activeVideo.channels.id}`} className="transition hover:text-accent">
-              {activeVideo.channels.title}
+          <div className="mt-4">
+            <h2 className="text-lg font-semibold leading-snug text-foreground">{activeVideo.title}</h2>
+            <Link
+              href={`/suvag/${activeVideo.channels.id}`}
+              className="mt-2 flex items-center gap-2 text-sm text-muted transition hover:text-accent"
+            >
+              <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full bg-surface">
+                {activeVideo.channels.avatar_url && (
+                  <Image
+                    src={activeVideo.channels.avatar_url}
+                    alt={activeVideo.channels.title}
+                    fill
+                    sizes="28px"
+                    className="object-cover"
+                  />
+                )}
+              </span>
+              <span className="flex flex-wrap items-center gap-x-1.5">
+                <span className="font-medium">{activeVideo.channels.title}</span>
+                <span>· {formatViews(activeVideo.view_count)}</span>
+                <span>· {formatDate(activeVideo.published_at)}</span>
+              </span>
             </Link>
-            <span>{formatViews(activeVideo.view_count)}</span>
-            <span>{formatDate(activeVideo.published_at)}</span>
           </div>
         </div>
       ) : (
@@ -136,45 +154,85 @@ export default async function MoviePage({ params, searchParams }: Props) {
       {movie.videos.length > 1 && (
         <div className="mt-8">
           <h2 className="mb-4 text-lg font-bold">Бүх тайлбар бичлэгүүд ({movie.videos.length})</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {movie.videos.map((video) => {
-              const active = video.id === activeVideo?.id;
-              return (
-                <Link
-                  key={video.id}
-                  href={`/kino/${movie.slug}?v=${video.id}`}
-                  className={`flex gap-3 rounded-lg p-2 ring-1 transition ${
-                    active
-                      ? "bg-surface ring-accent/60"
-                      : "ring-white/5 hover:bg-surface hover:ring-white/10"
-                  }`}
-                >
-                  <div className="relative aspect-video w-36 shrink-0 overflow-hidden rounded bg-surface">
-                    {video.thumbnail_url && (
-                      <Image
-                        src={video.thumbnail_url}
-                        alt={video.title}
-                        fill
-                        sizes="144px"
-                        className="object-cover"
-                      />
-                    )}
-                    {video.duration_seconds ? (
-                      <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px]">
-                        {formatDuration(video.duration_seconds)}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="line-clamp-2 text-sm font-medium leading-snug">{video.title}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      {video.channels.title} · {formatViews(video.view_count)}
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+
+          <Link
+            href={`/kino/${movie.slug}?v=${topVideo.id}`}
+            className={`flex flex-col gap-3 rounded-lg p-3 ring-1 transition sm:flex-row ${
+              topVideo.id === activeVideo?.id
+                ? "bg-surface ring-accent/60"
+                : "ring-white/5 hover:bg-surface hover:ring-white/10"
+            }`}
+          >
+            <div className="relative aspect-video w-full shrink-0 overflow-hidden rounded bg-surface sm:w-80">
+              {topVideo.thumbnail_url && (
+                <Image
+                  src={topVideo.thumbnail_url}
+                  alt={topVideo.title}
+                  fill
+                  sizes="(max-width: 640px) 100vw, 320px"
+                  className="object-cover"
+                />
+              )}
+              {topVideo.duration_seconds ? (
+                <span className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-xs">
+                  {formatDuration(topVideo.duration_seconds)}
+                </span>
+              ) : null}
+              <span className="absolute left-1.5 top-1.5 rounded bg-accent px-2 py-0.5 text-xs font-semibold text-black">
+                Хамгийн их үзэлттэй
+              </span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-base font-semibold leading-snug">{topVideo.title}</p>
+              <p className="mt-1.5 text-sm text-muted">
+                {topVideo.channels.title} · {formatViews(topVideo.view_count)} ·{" "}
+                {formatDate(topVideo.published_at)}
+              </p>
+            </div>
+          </Link>
+
+          {otherVideos.length > 0 && (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {otherVideos.map((video) => {
+                const active = video.id === activeVideo?.id;
+                return (
+                  <Link
+                    key={video.id}
+                    href={`/kino/${movie.slug}?v=${video.id}`}
+                    className={`flex gap-3 rounded-lg p-2 ring-1 transition ${
+                      active
+                        ? "bg-surface ring-accent/60"
+                        : "ring-white/5 hover:bg-surface hover:ring-white/10"
+                    }`}
+                  >
+                    <div className="relative aspect-video w-36 shrink-0 overflow-hidden rounded bg-surface">
+                      {video.thumbnail_url && (
+                        <Image
+                          src={video.thumbnail_url}
+                          alt={video.title}
+                          fill
+                          sizes="144px"
+                          className="object-cover"
+                        />
+                      )}
+                      {video.duration_seconds ? (
+                        <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px]">
+                          {formatDuration(video.duration_seconds)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="line-clamp-2 text-sm font-medium leading-snug">{video.title}</p>
+                      <p className="mt-1 text-xs text-muted">
+                        {video.channels.title} · {formatViews(video.view_count)} ·{" "}
+                        {formatDate(video.published_at)}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

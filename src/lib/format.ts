@@ -1,8 +1,6 @@
 export function formatViews(n: number | null): string {
   if (n === null) return "";
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")} сая үзэлт`;
-  if (n >= 1_000) return `${Math.round(n / 1_000)} мянган үзэлт`;
-  return `${n} үзэлт`;
+  return `${n.toLocaleString("en-US")} үзэлт`;
 }
 
 export function formatDuration(seconds: number | null): string {

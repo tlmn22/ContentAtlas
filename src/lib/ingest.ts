@@ -14,6 +14,30 @@ export interface ChannelSyncResult {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const PAGE_SIZE = 1000;
+
+/**
+ * Supabase/PostgREST caps a single request at 1000 rows by default. Queries
+ * that need every matching row (not just a bounded "top N" list) must page
+ * through with .range() or they silently truncate once a channel or the
+ * unmatched queue grows past that cap.
+ */
+async function fetchAllRows<T>(
+  query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await query(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 /**
  * Sync one channel: pull new uploads, enrich, auto-match to TMDB,
  * and sweep existing videos for deleted/hidden ones.
@@ -99,13 +123,15 @@ export async function syncChannel(db: SupabaseClient, channel: Channel): Promise
  * view counts of live ones are refreshed. Costs 1 quota unit per 50 videos.
  */
 async function sweepAvailability(db: SupabaseClient, channelId: string): Promise<number> {
-  const { data: live, error } = await db
-    .from("videos")
-    .select("id")
-    .eq("channel_id", channelId)
-    .eq("is_available", true);
-  if (error) throw error;
-  if (!live || live.length === 0) return 0;
+  const live = await fetchAllRows<{ id: string }>((from, to) =>
+    db
+      .from("videos")
+      .select("id")
+      .eq("channel_id", channelId)
+      .eq("is_available", true)
+      .range(from, to)
+  );
+  if (live.length === 0) return 0;
 
   const details = await getVideoDetails(live.map((r) => r.id));
   let marked = 0;
@@ -155,15 +181,17 @@ export async function ingestAll(db: SupabaseClient): Promise<ChannelSyncResult[]
  * ever attempts matching once, on first ingest.
  */
 export async function rematchUnmatched(db: SupabaseClient): Promise<{ matched: number; total: number }> {
-  const { data: videos, error } = await db
-    .from("videos")
-    .select("id, title")
-    .eq("match_status", "unmatched")
-    .eq("is_available", true);
-  if (error) throw error;
+  const videos = await fetchAllRows<{ id: string; title: string }>((from, to) =>
+    db
+      .from("videos")
+      .select("id, title")
+      .eq("match_status", "unmatched")
+      .eq("is_available", true)
+      .range(from, to)
+  );
 
   let matched = 0;
-  for (const v of videos ?? []) {
+  for (const v of videos) {
     try {
       const match = await findMovieForTitle(v.title);
       if (match) {
@@ -176,5 +204,5 @@ export async function rematchUnmatched(db: SupabaseClient): Promise<{ matched: n
     }
     await sleep(100);
   }
-  return { matched, total: videos?.length ?? 0 };
+  return { matched, total: videos.length };
 }

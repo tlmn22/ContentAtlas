@@ -58,6 +58,20 @@ export async function getPopularMovies(limit = 12): Promise<MovieCardData[]> {
   return movies;
 }
 
+/** Highest-rated movies (TMDB score) that have at least one available video. */
+export async function getTopRatedMovies(limit = 12): Promise<MovieCardData[]> {
+  const db = getDb();
+  const { data, error } = await db
+    .from("movies")
+    .select(`${MOVIE_CARD_COLS}, videos!inner(id)`)
+    .eq("videos.is_available", true)
+    .not("vote_average", "is", null)
+    .order("vote_average", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as unknown as MovieCardData[];
+}
+
 /** Movies in a genre that have at least one available video. */
 export async function getMoviesByGenre(genreId: number, limit = 12): Promise<MovieCardData[]> {
   const db = getDb();
@@ -122,7 +136,7 @@ export async function getChannelWithVideos(
     .select(`*, movies(${MOVIE_CARD_COLS})`)
     .eq("channel_id", channelId)
     .eq("is_available", true)
-    .order("published_at", { ascending: false })
+    .order("view_count", { ascending: false, nullsFirst: false })
     .limit(200);
   if (vErr) throw vErr;
 

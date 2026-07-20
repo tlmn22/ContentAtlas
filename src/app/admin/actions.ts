@@ -2,9 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ensureMovie } from "@/lib/matcher";
 import { getDb } from "@/lib/supabase";
-import { getMovieById } from "@/lib/tmdb";
 import { getChannelInfo } from "@/lib/youtube";
 
 export async function addChannel(formData: FormData) {
@@ -48,28 +46,4 @@ export async function deleteChannel(id: string) {
   const db = getDb();
   await db.from("channels").delete().eq("id", id);
   revalidatePath("/admin");
-}
-
-/** Manually link an unmatched video to a TMDB movie. */
-export async function linkVideo(videoId: string, tmdbId: number, titleMn: string | null) {
-  const movie = await getMovieById(tmdbId);
-  if (!movie) redirect("/admin/unmatched?error=" + encodeURIComponent("TMDB кино олдсонгүй"));
-
-  const db = getDb();
-  const movieDbId = await ensureMovie(db, movie, titleMn);
-  await db
-    .from("videos")
-    .update({ movie_id: movieDbId, match_status: "manual" })
-    .eq("id", videoId);
-
-  revalidatePath("/admin/unmatched");
-  redirect("/admin/unmatched?ok=" + encodeURIComponent("Холбогдлоо"));
-}
-
-/** Hide a video from the matching queue (trailers, vlogs, non-movie content). */
-export async function ignoreVideo(videoId: string) {
-  const db = getDb();
-  await db.from("videos").update({ match_status: "ignored" }).eq("id", videoId);
-  revalidatePath("/admin/unmatched");
-  redirect("/admin/unmatched");
 }

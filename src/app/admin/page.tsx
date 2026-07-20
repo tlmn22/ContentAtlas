@@ -23,6 +23,19 @@ export default async function AdminPage({ searchParams }: Props) {
   ]);
   const channels = (channelsRes.data ?? []) as Channel[];
 
+  // Per-channel head-count queries (not a single unfiltered select) so counts
+  // stay correct past Supabase's default 1000-row-per-request cap.
+  const videoCountByChannel = new Map<string, number>();
+  await Promise.all(
+    channels.map(async (c) => {
+      const { count } = await db
+        .from("videos")
+        .select("*", { count: "exact", head: true })
+        .eq("channel_id", c.id);
+      videoCountByChannel.set(c.id, count ?? 0);
+    })
+  );
+
   return (
     <div className="mt-8">
       <div className="flex items-center justify-between">
@@ -83,6 +96,7 @@ export default async function AdminPage({ searchParams }: Props) {
             <thead>
               <tr className="border-b border-white/10 text-left text-muted">
                 <th className="py-2 pr-4 font-medium">Суваг</th>
+                <th className="py-2 pr-4 font-medium">Бичлэг</th>
                 <th className="py-2 pr-4 font-medium">Төлөв</th>
                 <th className="py-2 pr-4 font-medium">Сүүлд шалгасан</th>
                 <th className="py-2 font-medium">Үйлдэл</th>
@@ -99,13 +113,14 @@ export default async function AdminPage({ searchParams }: Props) {
                         )}
                       </div>
                       <div>
-                        <Link href={`/suvag/${c.id}`} className="font-medium hover:text-accent">
+                        <Link href={`/admin/channel/${c.id}`} className="font-medium hover:text-accent">
                           {c.title}
                         </Link>
                         {c.handle && <span className="ml-2 text-xs text-muted">@{c.handle}</span>}
                       </div>
                     </div>
                   </td>
+                  <td className="py-3 pr-4 text-muted">{videoCountByChannel.get(c.id) ?? 0}</td>
                   <td className="py-3 pr-4">
                     {c.is_active ? (
                       <span className="text-green-400">Идэвхтэй</span>
