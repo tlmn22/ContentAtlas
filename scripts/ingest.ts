@@ -1,13 +1,14 @@
 /**
  * CLI ingestion worker.
- *   npm run ingest                - sync all active channels
- *   npm run ingest -- UCxxxx      - sync a single channel by id
- *   npm run ingest -- --rematch   - retry TMDB matching for unmatched videos
+ *   npm run ingest                       - sync all active channels
+ *   npm run ingest -- UCxxxx             - sync a single channel by id
+ *   npm run ingest -- --rematch          - retry TMDB matching for unmatched videos
+ *   npm run ingest -- --backfill-details - fill in runtime/imdb_id/budget/... for movies missing them
  */
 import { config } from "dotenv";
 config({ path: ".env.local" });
 import { getDb } from "../src/lib/supabase";
-import { ingestAll, rematchUnmatched, syncChannel } from "../src/lib/ingest";
+import { backfillMovieDetails, ingestAll, rematchUnmatched, syncChannel } from "../src/lib/ingest";
 import { Channel } from "../src/lib/types";
 
 async function main() {
@@ -17,6 +18,12 @@ async function main() {
   if (arg === "--rematch") {
     const { matched, total } = await rematchUnmatched(db);
     console.log(`Дахин тааруулалт: ${matched}/${total} бичлэг таарлаа.`);
+    return;
+  }
+
+  if (arg === "--backfill-details") {
+    const { updated, total } = await backfillMovieDetails(db);
+    console.log(`Дэлгэрэнгүй мэдээлэл нөхөлт: ${updated}/${total} кино шинэчлэгдлээ.`);
     return;
   }
 

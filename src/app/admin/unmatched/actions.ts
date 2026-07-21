@@ -1,6 +1,8 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { ADMIN_SESSION_COOKIE, verifySessionToken } from "@/lib/admin-auth";
 import { ensureMovie } from "@/lib/matcher";
 import { getDb } from "@/lib/supabase";
 import { getMovieById, searchMovie, TmdbMovie } from "@/lib/tmdb";
@@ -14,6 +16,12 @@ export async function searchTmdbForVideo(query: string, year?: number): Promise<
   return results;
 }
 
+async function currentAdminUsername(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const session = await verifySessionToken(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  return session?.username ?? null;
+}
+
 export async function linkVideoInline(
   videoId: string,
   tmdbId: number,
@@ -24,13 +32,15 @@ export async function linkVideoInline(
 
   const db = getDb();
   const movieDbId = await ensureMovie(db, movie, titleMn);
+  const matchedBy = await currentAdminUsername();
   const { error } = await db
     .from("videos")
-    .update({ movie_id: movieDbId, match_status: "manual" })
+    .update({ movie_id: movieDbId, match_status: "manual", matched_by: matchedBy })
     .eq("id", videoId);
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/admin/unmatched");
+  revalidatePath("/admin");
   return { ok: true };
 }
 

@@ -77,13 +77,12 @@ export default function ChannelVideoRow({
             {formatViews(video.view_count)} · {formatDate(video.published_at)}
           </p>
           {movie ? (
-            <Link
-              href={`/kino/${movie.slug}`}
-              target="_blank"
-              className="mt-1 inline-block text-xs text-accent hover:underline"
-            >
-              Холбогдсон: {movie.title_mn ?? movie.title} ({movie.year ?? "?"})
-            </Link>
+            <p className="mt-1 text-xs">
+              <Link href={`/kino/${movie.slug}`} target="_blank" className="text-accent hover:underline">
+                Холбогдсон: {movie.title_mn ?? movie.title} ({movie.year ?? "?"})
+              </Link>
+              {video.matched_by && <span className="text-muted"> · {video.matched_by}</span>}
+            </p>
           ) : (
             <span className="mt-1 inline-block text-xs text-muted">Холбогдоогүй</span>
           )}

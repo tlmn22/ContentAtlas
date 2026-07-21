@@ -47,3 +47,35 @@ export async function deleteChannel(id: string) {
   await db.from("channels").delete().eq("id", id);
   revalidatePath("/admin");
 }
+
+export async function addAdminUser(formData: FormData) {
+  const username = String(formData.get("username") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+
+  if (!/^[a-zA-Z0-9_.-]{2,32}$/.test(username)) {
+    redirect(
+      "/admin?error=" + encodeURIComponent("Нэвтрэх нэр 2-32 тэмдэгт, зөвхөн үсэг/тоо байх ёстой")
+    );
+  }
+  if (password.length < 4) {
+    redirect("/admin?error=" + encodeURIComponent("Нууц үг дор хаяж 4 тэмдэгт байх ёстой"));
+  }
+
+  const db = getDb();
+  const { error } = await db.rpc("upsert_admin_user", { p_username: username, p_password: password });
+  if (error) redirect("/admin?error=" + encodeURIComponent(error.message));
+
+  revalidatePath("/admin");
+  redirect("/admin?ok=" + encodeURIComponent(`«${username}» admin хэрэглэгч нэмэгдлээ`));
+}
+
+export async function deleteAdminUser(username: string) {
+  const db = getDb();
+  const { count } = await db.from("admin_users").select("*", { count: "exact", head: true });
+  if ((count ?? 0) <= 1) {
+    redirect("/admin?error=" + encodeURIComponent("Сүүлчийн admin хэрэглэгчийг устгах боломжгүй"));
+  }
+
+  await db.from("admin_users").delete().eq("username", username);
+  revalidatePath("/admin");
+}

@@ -8,6 +8,29 @@ export type MovieCardData = Pick<
 
 const MOVIE_CARD_COLS = "id, slug, title, title_mn, year, poster_path, vote_average";
 
+export type TopPlayedMovie = MovieCardData & { play_count: number };
+
+/** Movies ranked by plays of our own embedded player (not YouTube's view_count). */
+export async function getTopPlayedMovies(limit = 10): Promise<TopPlayedMovie[]> {
+  const db = getDb();
+  const { data, error } = await db.rpc("top_played_movies", { result_limit: limit });
+  if (error) throw error;
+  return (data ?? []) as TopPlayedMovie[];
+}
+
+export interface AdminMatchCount {
+  username: string;
+  match_count: number;
+}
+
+/** How many videos each admin has manually matched to a movie. */
+export async function getMatchesByAdmin(): Promise<AdminMatchCount[]> {
+  const db = getDb();
+  const { data, error } = await db.rpc("matches_by_admin");
+  if (error) throw error;
+  return (data ?? []) as AdminMatchCount[];
+}
+
 /** Latest matched videos, deduplicated into unique movies (newest first). */
 export async function getLatestMovies(limit = 12): Promise<MovieCardData[]> {
   const db = getDb();

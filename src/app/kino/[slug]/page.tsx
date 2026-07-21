@@ -2,7 +2,8 @@ import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatDate, formatDuration, formatViews } from "@/lib/format";
+import TrackPlay from "@/components/TrackPlay";
+import { formatDate, formatDuration, formatMoney, formatRuntime, formatViews } from "@/lib/format";
 import { getMovieBySlug } from "@/lib/queries";
 import { posterUrl } from "@/lib/tmdb";
 
@@ -56,6 +57,16 @@ export default async function MoviePage({ params, searchParams }: Props) {
     datePublished: movie.year ? `${movie.year}` : undefined,
     image: posterUrl(movie.poster_path, "w500") ?? undefined,
     description: movie.overview_mn ?? movie.overview ?? undefined,
+    duration: movie.runtime ? `PT${movie.runtime}M` : undefined,
+    aggregateRating:
+      movie.vote_average && movie.vote_count
+        ? {
+            "@type": "AggregateRating",
+            ratingValue: movie.vote_average,
+            ratingCount: movie.vote_count,
+            bestRating: 10,
+          }
+        : undefined,
   };
 
   return (
@@ -85,11 +96,18 @@ export default async function MoviePage({ params, searchParams }: Props) {
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-extrabold sm:text-3xl">{name}</h1>
           {movie.title_mn && <p className="mt-1 text-lg text-muted">{movie.title}</p>}
+          {movie.tagline && <p className="mt-2 italic text-muted">&ldquo;{movie.tagline}&rdquo;</p>}
 
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
             {movie.year && <span className="text-muted">{movie.year}</span>}
+            {movie.runtime && <span className="text-muted">{formatRuntime(movie.runtime)}</span>}
             {movie.vote_average ? (
-              <span className="font-semibold text-accent">★ {Number(movie.vote_average).toFixed(1)}</span>
+              <span className="font-semibold text-accent">
+                ★ {Number(movie.vote_average).toFixed(1)}
+                {movie.vote_count ? (
+                  <span className="font-normal text-muted"> ({movie.vote_count.toLocaleString("en-US")} санал)</span>
+                ) : null}
+              </span>
             ) : null}
             {genres.map((g) => (
               <Link
@@ -100,6 +118,16 @@ export default async function MoviePage({ params, searchParams }: Props) {
                 {g.name_mn}
               </Link>
             ))}
+            {movie.imdb_id && (
+              <a
+                href={`https://www.imdb.com/title/${movie.imdb_id}/`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded bg-[#f5c518] px-2 py-0.5 text-xs font-bold text-black transition hover:brightness-95"
+              >
+                IMDb
+              </a>
+            )}
           </div>
 
           {(movie.overview_mn ?? movie.overview) && (
@@ -107,11 +135,27 @@ export default async function MoviePage({ params, searchParams }: Props) {
               {movie.overview_mn ?? movie.overview}
             </p>
           )}
+
+          {(movie.budget || movie.revenue) && (
+            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
+              {movie.budget ? (
+                <span>
+                  Төсөв: <span className="text-foreground">{formatMoney(movie.budget)}</span>
+                </span>
+              ) : null}
+              {movie.revenue ? (
+                <span>
+                  Орлого: <span className="text-foreground">{formatMoney(movie.revenue)}</span>
+                </span>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 
       {activeVideo ? (
         <div className="mt-10">
+          <TrackPlay movieId={movie.id} videoId={activeVideo.id} />
           <div className="aspect-video w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
             <iframe
               key={activeVideo.id}

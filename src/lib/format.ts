@@ -13,6 +13,19 @@ export function formatDuration(seconds: number | null): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+export function formatRuntime(minutes: number | null): string {
+  if (!minutes) return "";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}мин`;
+  return m === 0 ? `${h}ц` : `${h}ц ${m}мин`;
+}
+
+export function formatMoney(n: number | null): string {
+  if (!n) return "";
+  return `$${n.toLocaleString("en-US")}`;
+}
+
 export function formatDate(iso: string): string {
   const d = new Date(iso);
   const y = d.getFullYear();

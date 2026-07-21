@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeForCompare, parseVideoTitle } from "./title-parser";
-import { releaseYear, searchMovie, TmdbMovie } from "./tmdb";
+import { getMovieById, releaseYear, searchMovie, TmdbMovie } from "./tmdb";
 
 export interface MatchResult {
   movie: TmdbMovie;
@@ -105,33 +105,47 @@ export async function ensureMovie(
     return existing.id;
   }
 
-  const year = releaseYear(tmdbMovie);
-  let slug = slugify(tmdbMovie.title, year);
+  // /search/movie (auto-match path) lacks runtime/imdb_id/budget/revenue -
+  // fetch the full /movie/{id} details once so every row we insert is complete.
+  let details = tmdbMovie;
+  if (tmdbMovie.runtime === undefined) {
+    const full = await getMovieById(tmdbMovie.id);
+    if (full) details = full;
+  }
+
+  const year = releaseYear(details);
+  let slug = slugify(details.title, year);
 
   const { data: slugTaken } = await db.from("movies").select("id").eq("slug", slug).maybeSingle();
-  if (slugTaken) slug = `${slug}-${tmdbMovie.id}`;
+  if (slugTaken) slug = `${slug}-${details.id}`;
 
   const { data: inserted, error: insErr } = await db
     .from("movies")
     .insert({
-      tmdb_id: tmdbMovie.id,
+      tmdb_id: details.id,
       slug,
-      title: tmdbMovie.title,
-      original_title: tmdbMovie.original_title,
+      title: details.title,
+      original_title: details.original_title,
       title_mn: titleMn,
       year,
-      overview: tmdbMovie.overview || null,
-      poster_path: tmdbMovie.poster_path,
-      backdrop_path: tmdbMovie.backdrop_path,
-      vote_average: tmdbMovie.vote_average || null,
+      overview: details.overview || null,
+      poster_path: details.poster_path,
+      backdrop_path: details.backdrop_path,
+      vote_average: details.vote_average || null,
+      vote_count: details.vote_count ?? null,
+      runtime: details.runtime ?? null,
+      imdb_id: details.imdb_id ?? null,
+      budget: details.budget || null,
+      revenue: details.revenue || null,
+      tagline: details.tagline || null,
     })
     .select("id")
     .single();
   if (insErr) throw insErr;
 
-  if (tmdbMovie.genre_ids?.length) {
+  if (details.genre_ids?.length) {
     // Genres are pre-seeded; ignore ids TMDB adds later that we don't know
-    const { data: known } = await db.from("genres").select("id").in("id", tmdbMovie.genre_ids);
+    const { data: known } = await db.from("genres").select("id").in("id", details.genre_ids);
     const rows = (known ?? []).map((g) => ({ movie_id: inserted.id, genre_id: g.id }));
     if (rows.length) await db.from("movie_genres").upsert(rows);
   }

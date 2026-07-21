@@ -2,18 +2,27 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ADMIN_SESSION_COOKIE, computeSessionToken } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE, createSessionToken } from "@/lib/admin-auth";
+import { getDb } from "@/lib/supabase";
 
 export async function login(formData: FormData) {
   const username = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const adminPassword = process.env.ADMIN_PASSWORD;
 
-  if (!adminPassword || username !== "admin" || password !== adminPassword) {
+  if (!username || !password) {
+    redirect("/admin/login?error=" + encodeURIComponent("Нэвтрэх нэр, нууц үгээ оруулна уу"));
+  }
+
+  const db = getDb();
+  const { data: ok, error } = await db.rpc("verify_admin_login", {
+    p_username: username,
+    p_password: password,
+  });
+  if (error || !ok) {
     redirect("/admin/login?error=" + encodeURIComponent("Нэвтрэх нэр эсвэл нууц үг буруу байна"));
   }
 
-  const token = await computeSessionToken(adminPassword);
+  const token = await createSessionToken(username);
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,

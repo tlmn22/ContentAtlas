@@ -45,6 +45,15 @@ export interface TmdbMovie {
   vote_average: number;
   popularity: number;
   genre_ids: number[];
+  // Only present when fetched via getMovieById (/movie/{id}) - /search/movie
+  // doesn't return these. `undefined` means "not fetched", `null` means
+  // "fetched, TMDB has no value" - ensureMovie() relies on that distinction.
+  vote_count?: number;
+  runtime?: number | null;
+  imdb_id?: string | null;
+  budget?: number;
+  revenue?: number;
+  tagline?: string;
 }
 
 export async function searchMovie(query: string, year?: number): Promise<TmdbMovie[]> {

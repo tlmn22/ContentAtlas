@@ -24,6 +24,12 @@ export interface Movie {
   poster_path: string | null;
   backdrop_path: string | null;
   vote_average: number | null;
+  vote_count: number | null;
+  runtime: number | null;
+  imdb_id: string | null;
+  budget: number | null;
+  revenue: number | null;
+  tagline: string | null;
   created_at: string;
 }
 
@@ -43,6 +49,7 @@ export interface Video {
   view_count: number | null;
   movie_id: number | null;
   match_status: MatchStatus;
+  matched_by: string | null;
   is_available: boolean;
   created_at: string;
   updated_at: string;

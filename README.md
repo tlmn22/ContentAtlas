@@ -26,12 +26,17 @@ cp .env.example .env.local
 | `YOUTUBE_API_KEY` | Google Cloud Console → YouTube Data API v3 идэвхжүүлж API key үүсгэх |
 | `TMDB_API_TOKEN` | themoviedb.org → Settings → API → **API Read Access Token** (v4) |
 | `CRON_SECRET` | Санамсаргүй урт тэмдэгт мөр (`openssl rand -hex 32`) |
-| `ADMIN_PASSWORD` | `/admin` хуудасны нууц үг (хэрэглэгчийн нэр: `admin`) |
+| `ADMIN_SESSION_SECRET` | `/admin` session cookie гарын үсэг зурах нууц (`openssl rand -hex 32`) — хэрэглэгчийн нууц үгтэй хамааралгүй |
 | `NEXT_PUBLIC_SITE_URL` | Deploy хийсэн домэйн (SEO/sitemap-д хэрэглэнэ) |
 
 ### 2. Өгөгдлийн сангийн schema
 
-Supabase Dashboard → SQL Editor дээр [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) файлын агуулгыг бүхэлд нь ажиллуулна. (Эсвэл Supabase CLI: `supabase db push`.)
+Supabase Dashboard → SQL Editor дээр `supabase/migrations/` доторх бүх файлыг **дугаарын дарааллаар нь** (0001, 0002, ...) ажиллуулна. (Эсвэл Supabase CLI: `supabase db push`.)
+
+Эхний admin хэрэглэгчээ SQL Editor-оор шууд үүсгэнэ (энэ команд файлд хадгалагдахгүй, зөвхөн танай Supabase дээр л ажиллана):
+```sql
+select upsert_admin_user('admin', 'өөрийн-сонгосон-нууц-үг');
+```
 
 ### 3. Ажиллуулах
 
@@ -42,7 +47,7 @@ npm run dev
 
 ### 4. Суваг нэмээд контент татах
 
-1. `http://localhost:3000/admin` руу орж (нэвтрэх нэр: `admin`, нууц үг: `ADMIN_PASSWORD`) суваг нэмнэ. `@handle`, `UC...` id, эсвэл сувгийн URL аль нь ч болно.
+1. `http://localhost:3000/admin` руу дээрх алхамд үүсгэсэн admin хэрэглэгчээрээ нэвтэрч суваг нэмнэ. `@handle`, `UC...` id, эсвэл сувгийн URL аль нь ч болно.
 2. Ingestion worker ажиллуулна:
 
 ```bash

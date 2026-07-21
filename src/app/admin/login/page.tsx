@@ -22,8 +22,8 @@ export default async function AdminLoginPage({ searchParams }: Props) {
           <input
             type="text"
             name="username"
-            defaultValue="admin"
             required
+            autoFocus
             autoComplete="username"
             className="rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm outline-none focus:border-accent/60"
           />
@@ -34,7 +34,6 @@ export default async function AdminLoginPage({ searchParams }: Props) {
             type="password"
             name="password"
             required
-            autoFocus
             autoComplete="current-password"
             className="rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm outline-none focus:border-accent/60"
           />

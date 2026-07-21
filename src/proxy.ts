@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_SESSION_COOKIE, computeSessionToken } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE, verifySessionToken } from "@/lib/admin-auth";
 
 /**
- * Cookie-session auth for /admin. /admin/login itself stays public so the
- * login form and its server action are reachable.
+ * Signed-cookie session auth for /admin. /admin/login itself stays public
+ * so the login form and its server action are reachable.
  */
 export async function proxy(req: NextRequest) {
-  const password = process.env.ADMIN_PASSWORD;
-  if (!password) {
-    return new NextResponse("ADMIN_PASSWORD тохируулагдаагүй тул /admin хаалттай байна.", {
+  if (!process.env.ADMIN_SESSION_SECRET) {
+    return new NextResponse("ADMIN_SESSION_SECRET тохируулагдаагүй тул /admin хаалттай байна.", {
       status: 503,
     });
   }
 
   const cookie = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-  const expected = await computeSessionToken(password);
-  if (cookie === expected) return NextResponse.next();
+  const session = await verifySessionToken(cookie);
+  if (session) return NextResponse.next();
 
   return NextResponse.redirect(new URL("/admin/login", req.url));
 }

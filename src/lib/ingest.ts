@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { ensureMovie, findMovieForTitle } from "./matcher";
+import { getMovieById } from "./tmdb";
 import { getVideoDetails, listUploads, YtPlaylistVideo } from "./youtube";
 import { Channel } from "./types";
 
@@ -205,4 +206,44 @@ export async function rematchUnmatched(db: SupabaseClient): Promise<{ matched: n
     await sleep(100);
   }
   return { matched, total: videos.length };
+}
+
+/**
+ * Backfills runtime/imdb_id/budget/revenue/vote_count/tagline for movies
+ * inserted before those columns existed (or via the auto-match path before
+ * ensureMovie started fetching full TMDB details). Safe to re-run - only
+ * targets rows where runtime is still null.
+ */
+export async function backfillMovieDetails(
+  db: SupabaseClient
+): Promise<{ updated: number; total: number }> {
+  const movies = await fetchAllRows<{ id: number; tmdb_id: number; title: string }>((from, to) =>
+    db.from("movies").select("id, tmdb_id, title").is("runtime", null).range(from, to)
+  );
+
+  let updated = 0;
+  for (const m of movies) {
+    try {
+      const details = await getMovieById(m.tmdb_id);
+      if (details) {
+        const { error } = await db
+          .from("movies")
+          .update({
+            vote_count: details.vote_count ?? null,
+            runtime: details.runtime ?? null,
+            imdb_id: details.imdb_id ?? null,
+            budget: details.budget || null,
+            revenue: details.revenue || null,
+            tagline: details.tagline || null,
+          })
+          .eq("id", m.id);
+        if (error) throw error;
+        updated++;
+      }
+    } catch (err) {
+      console.error(`Backfill failed for movie ${m.id} "${m.title}":`, err);
+    }
+    await sleep(100);
+  }
+  return { updated, total: movies.length };
 }
