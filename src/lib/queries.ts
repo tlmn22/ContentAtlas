@@ -1,14 +1,43 @@
 import { getDb } from "./supabase";
 import { Channel, Genre, Movie, MovieWithGenres, Video, VideoWithChannel } from "./types";
 
+export type MovieCardChannel = Pick<Channel, "id" | "title" | "avatar_url">;
+
 export type MovieCardData = Pick<
   Movie,
   "id" | "slug" | "title" | "title_mn" | "year" | "poster_path" | "vote_average"
->;
+> & { channels: MovieCardChannel[] };
 
 const MOVIE_CARD_COLS = "id, slug, title, title_mn, year, poster_path, vote_average";
 
-export type TopPlayedMovie = MovieCardData & { play_count: number };
+/** Batch-attaches the distinct channels that uploaded a recap for each movie (card badges). */
+async function attachChannels<T extends { id: number }>(
+  movies: T[]
+): Promise<(T & { channels: MovieCardChannel[] })[]> {
+  if (movies.length === 0) return [];
+  const db = getDb();
+  const { data, error } = await db
+    .from("videos")
+    .select("movie_id, channels(id, title, avatar_url)")
+    .in(
+      "movie_id",
+      movies.map((m) => m.id)
+    )
+    .eq("is_available", true);
+  if (error) throw error;
+
+  const channelsByMovie = new Map<number, Map<string, MovieCardChannel>>();
+  for (const row of data ?? []) {
+    const channel = row.channels as unknown as MovieCardChannel | null;
+    if (!channel || row.movie_id === null) continue;
+    if (!channelsByMovie.has(row.movie_id)) channelsByMovie.set(row.movie_id, new Map());
+    channelsByMovie.get(row.movie_id)!.set(channel.id, channel);
+  }
+
+  return movies.map((m) => ({ ...m, channels: Array.from(channelsByMovie.get(m.id)?.values() ?? []) }));
+}
+
+export type TopPlayedMovie = Omit<MovieCardData, "channels"> & { play_count: number };
 
 /** Movies ranked by plays of our own embedded player (not YouTube's view_count). */
 export async function getTopPlayedMovies(limit = 10): Promise<TopPlayedMovie[]> {
@@ -44,16 +73,16 @@ export async function getLatestMovies(limit = 12): Promise<MovieCardData[]> {
   if (error) throw error;
 
   const seen = new Set<number>();
-  const movies: MovieCardData[] = [];
+  const movies: Omit<MovieCardData, "channels">[] = [];
   for (const row of data ?? []) {
-    const movie = row.movies as unknown as MovieCardData | null;
+    const movie = row.movies as unknown as Omit<MovieCardData, "channels"> | null;
     if (movie && !seen.has(movie.id)) {
       seen.add(movie.id);
       movies.push(movie);
       if (movies.length >= limit) break;
     }
   }
-  return movies;
+  return attachChannels(movies);
 }
 
 /** Most-viewed matched videos, deduplicated into unique movies. */
@@ -69,16 +98,16 @@ export async function getPopularMovies(limit = 12): Promise<MovieCardData[]> {
   if (error) throw error;
 
   const seen = new Set<number>();
-  const movies: MovieCardData[] = [];
+  const movies: Omit<MovieCardData, "channels">[] = [];
   for (const row of data ?? []) {
-    const movie = row.movies as unknown as MovieCardData | null;
+    const movie = row.movies as unknown as Omit<MovieCardData, "channels"> | null;
     if (movie && !seen.has(movie.id)) {
       seen.add(movie.id);
       movies.push(movie);
       if (movies.length >= limit) break;
     }
   }
-  return movies;
+  return attachChannels(movies);
 }
 
 /** Highest-rated movies (TMDB score) that have at least one available video. */
@@ -92,7 +121,7 @@ export async function getTopRatedMovies(limit = 12): Promise<MovieCardData[]> {
     .order("vote_average", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []) as unknown as MovieCardData[];
+  return attachChannels((data ?? []) as unknown as Omit<MovieCardData, "channels">[]);
 }
 
 /** Movies in a genre that have at least one available video. */
@@ -106,7 +135,7 @@ export async function getMoviesByGenre(genreId: number, limit = 12): Promise<Mov
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []) as unknown as MovieCardData[];
+  return attachChannels((data ?? []) as unknown as Omit<MovieCardData, "channels">[]);
 }
 
 export async function getGenres(): Promise<Genre[]> {
@@ -144,7 +173,10 @@ export async function getMovieBySlug(
 
 export async function getChannelWithVideos(
   channelId: string
-): Promise<{ channel: Channel; videos: (Video & { movies: MovieCardData | null })[] } | null> {
+): Promise<{
+  channel: Channel;
+  videos: (Video & { movies: Omit<MovieCardData, "channels"> | null })[];
+} | null> {
   const db = getDb();
   const { data: channel, error } = await db
     .from("channels")
@@ -165,8 +197,34 @@ export async function getChannelWithVideos(
 
   return {
     channel: channel as Channel,
-    videos: (videos ?? []) as unknown as (Video & { movies: MovieCardData | null })[],
+    videos: (videos ?? []) as unknown as (Video & { movies: Omit<MovieCardData, "channels"> | null })[],
   };
+}
+
+/** Distinct movies this channel has an available recap for, most-viewed first. */
+export async function getChannelMovies(channelId: string, limit = 100): Promise<MovieCardData[]> {
+  const db = getDb();
+  const { data, error } = await db
+    .from("videos")
+    .select(`movie_id, view_count, movies(${MOVIE_CARD_COLS})`)
+    .eq("channel_id", channelId)
+    .eq("is_available", true)
+    .not("movie_id", "is", null)
+    .order("view_count", { ascending: false, nullsFirst: false })
+    .limit(limit * 3);
+  if (error) throw error;
+
+  const seen = new Set<number>();
+  const movies: Omit<MovieCardData, "channels">[] = [];
+  for (const row of data ?? []) {
+    const movie = row.movies as unknown as Omit<MovieCardData, "channels"> | null;
+    if (movie && !seen.has(movie.id)) {
+      seen.add(movie.id);
+      movies.push(movie);
+      if (movies.length >= limit) break;
+    }
+  }
+  return attachChannels(movies);
 }
 
 export async function getActiveChannels(): Promise<Channel[]> {
@@ -210,5 +268,5 @@ export async function searchMovies(params: MovieSearchParams): Promise<MovieCard
     .order("year", { ascending: false, nullsFirst: false })
     .limit(params.limit ?? 60);
   if (error) throw error;
-  return (data ?? []) as unknown as MovieCardData[];
+  return attachChannels((data ?? []) as unknown as Omit<MovieCardData, "channels">[]);
 }

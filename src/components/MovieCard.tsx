@@ -32,6 +32,30 @@ export default function MovieCard({ movie }: { movie: MovieCardData }) {
             ★ {Number(movie.vote_average).toFixed(1)}
           </span>
         ) : null}
+        {movie.channels.length > 0 && (
+          <div className="absolute right-1.5 top-1.5 flex -space-x-2">
+            {movie.channels.slice(0, 3).map((c) => (
+              <span
+                key={c.id}
+                title={c.title}
+                className="relative h-6 w-6 shrink-0 overflow-hidden rounded-full ring-2 ring-black/70"
+              >
+                {c.avatar_url ? (
+                  <Image src={c.avatar_url} alt={c.title} fill sizes="24px" className="object-cover" />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center bg-surface text-[10px] text-muted">
+                    {c.title.slice(0, 1)}
+                  </span>
+                )}
+              </span>
+            ))}
+            {movie.channels.length > 3 && (
+              <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/80 text-[10px] font-semibold text-muted ring-2 ring-black/70">
+                +{movie.channels.length - 3}
+              </span>
+            )}
+          </div>
+        )}
       </div>
       <p className="mt-2 line-clamp-2 text-sm font-medium leading-snug group-hover:text-accent">
         {displayTitle}

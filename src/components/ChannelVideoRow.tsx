@@ -18,7 +18,7 @@ export default function ChannelVideoRow({
   initialTitleMn,
 }: {
   video: Video;
-  movie: MovieCardData | null;
+  movie: Omit<MovieCardData, "channels"> | null;
   initialQuery: string;
   initialYear: number | null;
   initialTitleMn: string | null;

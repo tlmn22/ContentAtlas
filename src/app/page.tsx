@@ -1,8 +1,10 @@
 import Link from "next/link";
+import ChannelRow from "@/components/ChannelRow";
 import MovieRow from "@/components/MovieRow";
 import MovieSearchForm from "@/components/MovieSearchForm";
 import Section from "@/components/Section";
 import {
+  getActiveChannels,
   getGenres,
   getLatestMovies,
   getMoviesByGenre,
@@ -19,7 +21,8 @@ async function loadHome() {
   const homeGenres = HOME_GENRE_IDS.map((id) => genres.find((g) => g.id === id)).filter(
     (g) => g !== undefined
   );
-  const [latest, popular, topRated, genreRows] = await Promise.all([
+  const [channels, latest, popular, topRated, genreRows] = await Promise.all([
+    getActiveChannels(),
     getLatestMovies(15),
     getPopularMovies(15),
     getTopRatedMovies(15),
@@ -27,7 +30,7 @@ async function loadHome() {
       homeGenres.map((g) => getMoviesByGenre(g.id, 15).then((movies) => ({ genre: g, movies })))
     ),
   ]);
-  return { genres, latest, popular, topRated, genreRows };
+  return { genres, channels, latest, popular, topRated, genreRows };
 }
 
 export default async function HomePage() {
@@ -46,7 +49,7 @@ export default async function HomePage() {
     );
   }
 
-  const { genres, latest, popular, topRated, genreRows } = data;
+  const { genres, channels, latest, popular, topRated, genreRows } = data;
   const isEmpty = latest.length === 0 && popular.length === 0;
 
   return (
@@ -60,6 +63,12 @@ export default async function HomePage() {
           олоорой.
         </p>
       </div>
+
+      {channels.length > 0 && (
+        <Section title="Бүртгэлтэй сувгууд" href="/suvag">
+          <ChannelRow channels={channels} />
+        </Section>
+      )}
 
       {genres.length > 0 && (
         <div className="mt-6">

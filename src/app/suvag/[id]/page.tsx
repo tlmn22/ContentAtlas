@@ -1,8 +1,8 @@
 import { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import VideoCard from "@/components/VideoCard";
-import { getChannelWithVideos } from "@/lib/queries";
+import MovieGrid from "@/components/MovieGrid";
+import { getChannelMovies, getChannelWithVideos } from "@/lib/queries";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -16,16 +16,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!data) return { title: "Суваг олдсонгүй" };
   return {
     title: data.channel.title,
-    description: `${data.channel.title} сувгийн кино тайлбар бичлэгүүд.`,
+    description: `${data.channel.title} сувгийн кино тайлбарласан кинонууд.`,
   };
 }
 
 export default async function ChannelPage({ params }: Props) {
   const { id } = await params;
-  const data = await getChannelWithVideos(id);
-  if (!data) notFound();
+  const [channelData, movies] = await Promise.all([getChannelWithVideos(id), getChannelMovies(id)]);
+  if (!channelData) notFound();
 
-  const { channel, videos } = data;
+  const { channel } = channelData;
 
   return (
     <div className="mt-8">
@@ -39,7 +39,7 @@ export default async function ChannelPage({ params }: Props) {
           <h1 className="text-2xl font-extrabold">{channel.title}</h1>
           <p className="mt-1 text-sm text-muted">
             {channel.handle ? `@${channel.handle} · ` : ""}
-            {videos.length} бичлэг
+            {movies.length} кино
             {" · "}
             <a
               href={`https://www.youtube.com/channel/${channel.id}`}
@@ -53,15 +53,9 @@ export default async function ChannelPage({ params }: Props) {
         </div>
       </div>
 
-      {videos.length === 0 ? (
-        <p className="py-16 text-center text-muted">Бичлэг олдсонгүй.</p>
-      ) : (
-        <div className="mt-8 grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
-          {videos.map((video) => (
-            <VideoCard key={video.id} video={video} movie={video.movies} />
-          ))}
-        </div>
-      )}
+      <div className="mt-8">
+        <MovieGrid movies={movies} />
+      </div>
     </div>
   );
 }
