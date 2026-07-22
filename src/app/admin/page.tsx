@@ -85,9 +85,12 @@ export default async function AdminPage({ searchParams }: Props) {
         ))}
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-col gap-1">
         <Link href="/admin/unmatched" className="text-sm text-accent hover:underline">
           Таараагүй бичлэгүүдийг холбох →
+        </Link>
+        <Link href="/admin/movies" className="text-sm text-accent hover:underline">
+          Бүх кино удирдах (дахин холбох / устгах) →
         </Link>
       </div>
 

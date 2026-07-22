@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "KinoChid — Кино тайлбарын нэгдсэн сан",
-    short_name: "KinoChid",
+    name: "KinoTailbar — Кино тайлбарын нэгдсэн сан",
+    short_name: "KinoTailbar",
     description: "Монгол хэл дээрх кино тайлбар бичлэгүүдийг нэг дороос.",
     start_url: "/",
     display: "standalone",

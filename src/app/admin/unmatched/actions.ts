@@ -40,6 +40,7 @@ export async function linkVideoInline(
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/admin/unmatched");
+  revalidatePath("/admin/movies");
   revalidatePath("/admin");
   return { ok: true };
 }

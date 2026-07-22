@@ -1,4 +1,4 @@
-# KinoChid — Кино Recap Aggregator
+# KinoTailbar — Кино Recap Aggregator
 
 Монголын YouTube дээрх кино тайлбар (recap) сувгуудын бичлэгүүдийг нэг дор цуглуулж, кино сайт шиг цэгцтэй үзүүлдэг платформ. Бичлэгүүд YouTube embed-ээр тоглоно — видео хостинг хийхгүй.
 

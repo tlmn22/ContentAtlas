@@ -59,9 +59,14 @@ export default async function HomePage() {
           Кино тайлбарын нэгдсэн сан
         </h1>
         <p className="mt-2 max-w-xl text-sm text-muted sm:text-base">
-          Монголын шилдэг кино тайлбар сувгуудын бичлэгүүдийг нэг дороос — жанр, он, нэрээр нь хайж
-          олоорой.
+          Монголын шилдэг кино тайлбар сувгуудын бичлэгүүдийг нэг дороос
         </p>
+        <Link
+          href="/kino"
+          className="mt-4 inline-block rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-black transition hover:brightness-110"
+        >
+          Бүх киног харах
+        </Link>
       </div>
 
       {channels.length > 0 && (

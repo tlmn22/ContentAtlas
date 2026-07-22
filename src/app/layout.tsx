@@ -15,15 +15,15 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "KinoChid — Кино тайлбарын нэгдсэн сан",
-    template: "%s | KinoChid",
+    default: "KinoTailbar — Кино тайлбарын нэгдсэн сан",
+    template: "%s | KinoTailbar",
   },
   description:
     "Монгол хэл дээрх кино тайлбар бичлэгүүдийг нэг дороос. Жанр, он, нэрээр хайж дуртай киногоо олоорой.",
   openGraph: {
     type: "website",
     locale: "mn_MN",
-    siteName: "KinoChid",
+    siteName: "KinoTailbar",
   },
 };
 
@@ -40,7 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
             <Link href="/" className="flex shrink-0 items-center gap-2 font-extrabold tracking-tight">
               <span className="rounded bg-accent px-1.5 py-0.5 text-sm text-black">KINO</span>
-              <span className="text-lg">CHID</span>
+              <span className="text-lg">TAILBAR</span>
             </Link>
             <div className="flex-1" />
             <SearchBar />
@@ -60,7 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Бүх бичлэг YouTube дээрх эх сувгаасаа шууд тоглоно. Контентын эрх нь тухайн сувгийн
             эзэнд хамаарна.
           </p>
-          <p className="mt-2">Кино мэдээлэл: TMDB · © {new Date().getFullYear()} KinoChid</p>
+          <p className="mt-2">Кино мэдээлэл: TMDB · © {new Date().getFullYear()} KinoTailbar</p>
         </footer>
       </body>
     </html>

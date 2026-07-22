@@ -138,6 +138,116 @@ export async function getMoviesByGenre(genreId: number, limit = 12): Promise<Mov
   return attachChannels((data ?? []) as unknown as Omit<MovieCardData, "channels">[]);
 }
 
+export type MovieTableChannel = MovieCardChannel & { view_count: number };
+export type MovieTableRow = Omit<MovieCardData, "channels"> & { channels: MovieTableChannel[] };
+
+/**
+ * Every movie with at least one available video, for the full table listing.
+ * Each channel comes with the summed view_count of its recap video(s) for
+ * that movie (most-viewed channel first).
+ */
+export async function getAllMoviesForTable(limit = 1000): Promise<MovieTableRow[]> {
+  const db = getDb();
+  const { data: movies, error } = await db
+    .from("movies")
+    .select(`${MOVIE_CARD_COLS}, videos!inner(id)`)
+    .eq("videos.is_available", true)
+    .order("year", { ascending: false, nullsFirst: false })
+    .order("title", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+
+  const baseMovies = (movies ?? []) as unknown as Omit<MovieCardData, "channels">[];
+  if (baseMovies.length === 0) return [];
+
+  const { data: videoRows, error: vErr } = await db
+    .from("videos")
+    .select("movie_id, view_count, channels(id, title, avatar_url)")
+    .in(
+      "movie_id",
+      baseMovies.map((m) => m.id)
+    )
+    .eq("is_available", true);
+  if (vErr) throw vErr;
+
+  const channelsByMovie = new Map<number, Map<string, MovieTableChannel>>();
+  for (const row of videoRows ?? []) {
+    const channel = row.channels as unknown as MovieCardChannel | null;
+    if (!channel || row.movie_id === null) continue;
+    if (!channelsByMovie.has(row.movie_id)) channelsByMovie.set(row.movie_id, new Map());
+    const perMovie = channelsByMovie.get(row.movie_id)!;
+    const views = row.view_count ?? 0;
+    const existing = perMovie.get(channel.id);
+    if (existing) existing.view_count += views;
+    else perMovie.set(channel.id, { ...channel, view_count: views });
+  }
+
+  return baseMovies.map((m) => ({
+    ...m,
+    channels: Array.from(channelsByMovie.get(m.id)?.values() ?? []).sort(
+      (a, b) => b.view_count - a.view_count
+    ),
+  }));
+}
+
+export interface AdminMovieVideo {
+  id: string;
+  title: string;
+  thumbnail_url: string | null;
+  view_count: number | null;
+  channel: MovieCardChannel;
+}
+
+export type AdminMovieRow = Omit<MovieCardData, "channels"> & { videos: AdminMovieVideo[] };
+
+/**
+ * Every movie with its individual linked videos (not aggregated per channel),
+ * for the admin table where a wrongly-matched video needs to be re-linked,
+ * unlinked, or the whole movie deleted.
+ */
+export async function getAllMoviesForAdmin(limit = 1000): Promise<AdminMovieRow[]> {
+  const db = getDb();
+  const { data: movies, error } = await db
+    .from("movies")
+    .select(`${MOVIE_CARD_COLS}, videos!inner(id)`)
+    .eq("videos.is_available", true)
+    .order("year", { ascending: false, nullsFirst: false })
+    .order("title", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+
+  const baseMovies = (movies ?? []) as unknown as Omit<MovieCardData, "channels">[];
+  if (baseMovies.length === 0) return [];
+
+  const { data: videoRows, error: vErr } = await db
+    .from("videos")
+    .select("id, title, thumbnail_url, view_count, movie_id, channels(id, title, avatar_url)")
+    .in(
+      "movie_id",
+      baseMovies.map((m) => m.id)
+    )
+    .eq("is_available", true)
+    .order("view_count", { ascending: false, nullsFirst: false });
+  if (vErr) throw vErr;
+
+  const videosByMovie = new Map<number, AdminMovieVideo[]>();
+  for (const row of videoRows ?? []) {
+    if (row.movie_id === null) continue;
+    const channel = row.channels as unknown as MovieCardChannel | null;
+    if (!channel) continue;
+    if (!videosByMovie.has(row.movie_id)) videosByMovie.set(row.movie_id, []);
+    videosByMovie.get(row.movie_id)!.push({
+      id: row.id,
+      title: row.title,
+      thumbnail_url: row.thumbnail_url,
+      view_count: row.view_count,
+      channel,
+    });
+  }
+
+  return baseMovies.map((m) => ({ ...m, videos: videosByMovie.get(m.id) ?? [] }));
+}
+
 export async function getGenres(): Promise<Genre[]> {
   const db = getDb();
   const { data, error } = await db.from("genres").select("*").order("name_mn");
