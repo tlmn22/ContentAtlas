@@ -255,6 +255,25 @@ export async function getGenres(): Promise<Genre[]> {
   return (data ?? []) as Genre[];
 }
 
+/** Number of movies (with at least one available video) per genre id. */
+export async function getGenreMovieCounts(): Promise<Record<number, number>> {
+  const db = getDb();
+  const { data, error } = await db
+    .from("movies")
+    .select("movie_genres(genre_id), videos!inner(id)")
+    .eq("videos.is_available", true);
+  if (error) throw error;
+
+  const counts: Record<number, number> = {};
+  for (const row of data ?? []) {
+    const links = row.movie_genres as unknown as { genre_id: number }[];
+    for (const link of links ?? []) {
+      counts[link.genre_id] = (counts[link.genre_id] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
 export async function getMovieBySlug(
   slug: string
 ): Promise<(MovieWithGenres & { videos: VideoWithChannel[] }) | null> {

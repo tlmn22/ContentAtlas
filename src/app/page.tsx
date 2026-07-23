@@ -1,10 +1,11 @@
 import Link from "next/link";
 import ChannelRow from "@/components/ChannelRow";
 import MovieRow from "@/components/MovieRow";
-import MovieSearchForm from "@/components/MovieSearchForm";
 import Section from "@/components/Section";
+import Sidebar from "@/components/Sidebar";
 import {
   getActiveChannels,
+  getGenreMovieCounts,
   getGenres,
   getLatestMovies,
   getMoviesByGenre,
@@ -21,8 +22,9 @@ async function loadHome() {
   const homeGenres = HOME_GENRE_IDS.map((id) => genres.find((g) => g.id === id)).filter(
     (g) => g !== undefined
   );
-  const [channels, latest, popular, topRated, genreRows] = await Promise.all([
+  const [channels, genreCounts, latest, popular, topRated, genreRows] = await Promise.all([
     getActiveChannels(),
+    getGenreMovieCounts(),
     getLatestMovies(15),
     getPopularMovies(15),
     getTopRatedMovies(15),
@@ -30,7 +32,7 @@ async function loadHome() {
       homeGenres.map((g) => getMoviesByGenre(g.id, 15).then((movies) => ({ genre: g, movies })))
     ),
   ]);
-  return { genres, channels, latest, popular, topRated, genreRows };
+  return { genres, channels, genreCounts, latest, popular, topRated, genreRows };
 }
 
 export default async function HomePage() {
@@ -49,7 +51,7 @@ export default async function HomePage() {
     );
   }
 
-  const { genres, channels, latest, popular, topRated, genreRows } = data;
+  const { genres, channels, genreCounts, latest, popular, topRated, genreRows } = data;
   const isEmpty = latest.length === 0 && popular.length === 0;
 
   return (
@@ -69,55 +71,64 @@ export default async function HomePage() {
         </Link>
       </div>
 
-      {channels.length > 0 && (
-        <Section title="Бүртгэлтэй сувгууд" href="/suvag">
-          <ChannelRow channels={channels} />
-        </Section>
-      )}
+      <div className="mt-8 flex flex-col gap-8 md:flex-row md:items-start">
+        {genres.length > 0 && (
+          <aside className="order-2 md:order-1 md:w-48 md:shrink-0">
+            <Sidebar genres={genres} counts={genreCounts} />
+          </aside>
+        )}
 
-      {genres.length > 0 && (
-        <div className="mt-6">
-          <MovieSearchForm genres={genres} />
-        </div>
-      )}
+        <div className="order-1 min-w-0 flex-1 md:order-2">
+          {channels.length > 0 && (
+            <Section title="Бүртгэлтэй сувгууд" href="/suvag">
+              <ChannelRow channels={channels} />
+            </Section>
+          )}
 
-      {isEmpty ? (
-        <div className="py-20 text-center text-muted">
-          <p>Одоогоор контент алга. Ingestion worker ажиллуулсны дараа кинонууд энд гарч ирнэ.</p>
-          <p className="mt-2 text-sm">
-            <Link href="/admin" className="text-accent hover:underline">
-              /admin
-            </Link>{" "}
-            хуудсаар суваг нэмээд <code>npm run ingest</code> ажиллуулна уу.
-          </p>
-        </div>
-      ) : (
-        <>
-          {latest.length > 0 && (
-            <Section title="Шинэ нэмэгдсэн" href="/hailt">
-              <MovieRow movies={latest} />
-            </Section>
-          )}
-          {popular.length > 0 && (
-            <Section title="Их үзэлттэй">
-              <MovieRow movies={popular} />
-            </Section>
-          )}
-          {topRated.length > 0 && (
-            <Section title="Өндөр үнэлгээтэй">
-              <MovieRow movies={topRated} />
-            </Section>
-          )}
-          {genreRows.map(
-            ({ genre, movies }) =>
-              movies.length > 0 && (
-                <Section key={genre.id} title={genre.name_mn} href={`/hailt?genre=${genre.id}`}>
-                  <MovieRow movies={movies} />
+          {isEmpty ? (
+            <div className="py-20 text-center text-muted">
+              <p>Одоогоор контент алга. Ingestion worker ажиллуулсны дараа кинонууд энд гарч ирнэ.</p>
+              <p className="mt-2 text-sm">
+                <Link href="/admin" className="text-accent hover:underline">
+                  /admin
+                </Link>{" "}
+                хуудсаар суваг нэмээд <code>npm run ingest</code> ажиллуулна уу.
+              </p>
+            </div>
+          ) : (
+            <>
+              {latest.length > 0 && (
+                <Section title="Шинэ нэмэгдсэн" href="/hailt">
+                  <MovieRow movies={latest} />
                 </Section>
-              )
+              )}
+              {popular.length > 0 && (
+                <Section title="Их үзэлттэй">
+                  <MovieRow movies={popular} />
+                </Section>
+              )}
+              {topRated.length > 0 && (
+                <Section title="Өндөр үнэлгээтэй">
+                  <MovieRow movies={topRated} />
+                </Section>
+              )}
+              {genreRows.map(
+                ({ genre, movies }) =>
+                  movies.length > 0 && (
+                    <Section
+                      key={genre.id}
+                      title={genre.name_mn}
+                      href={`/hailt?genre=${genre.id}`}
+                      count={genreCounts[genre.id] ?? movies.length}
+                    >
+                      <MovieRow movies={movies} />
+                    </Section>
+                  )
+              )}
+            </>
           )}
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

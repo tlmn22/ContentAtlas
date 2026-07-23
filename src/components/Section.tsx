@@ -4,10 +4,12 @@ import { ReactNode } from "react";
 export default function Section({
   title,
   href,
+  count,
   children,
 }: {
   title: string;
   href?: string;
+  count?: number;
   children: ReactNode;
 }) {
   return (
@@ -16,7 +18,7 @@ export default function Section({
         <h2 className="text-lg font-bold sm:text-xl">{title}</h2>
         {href ? (
           <Link href={href} className="text-sm text-muted transition hover:text-accent">
-            Бүгдийг үзэх →
+            Бүгдийг үзэх{typeof count === "number" ? ` (${count})` : ""} →
           </Link>
         ) : null}
       </div>

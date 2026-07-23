@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import MovieGrid from "@/components/MovieGrid";
-import MovieSearchForm from "@/components/MovieSearchForm";
 import { getGenres, searchMovies } from "@/lib/queries";
 
 interface Props {
@@ -30,10 +29,6 @@ export default async function SearchPage({ searchParams }: Props) {
       <h1 className="text-2xl font-extrabold">
         {q ? `«${q}» хайлтын илэрц` : activeGenre ? `${activeGenre.name_mn} кинонууд` : "Хайлт"}
       </h1>
-
-      <div className="mt-5">
-        <MovieSearchForm genres={genres} defaultQuery={q} defaultGenreId={genreId} defaultYear={year} />
-      </div>
 
       <div className="mt-8">
         <MovieGrid movies={movies} />

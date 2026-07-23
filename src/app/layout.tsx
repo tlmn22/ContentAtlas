@@ -48,9 +48,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/hailt" className="transition hover:text-accent">
                 Хайлт
               </Link>
-              <Link href="/suvag" className="transition hover:text-accent">
-                Сувгууд
-              </Link>
             </nav>
           </div>
         </header>
