@@ -6,7 +6,12 @@ import { useState, useTransition } from "react";
 import { formatDate, formatViews } from "@/lib/format";
 import { posterUrl, releaseYear, type TmdbMovie } from "@/lib/tmdb";
 import { VideoWithChannel } from "@/lib/types";
-import { ignoreVideoInline, linkVideoInline, searchTmdbForVideo } from "@/app/admin/unmatched/actions";
+import {
+  deleteVideoInline,
+  ignoreVideoInline,
+  linkVideoInline,
+  searchTmdbForVideo,
+} from "@/app/admin/unmatched/actions";
 
 export default function UnmatchedRow({
   video,
@@ -59,6 +64,16 @@ export default function UnmatchedRow({
     });
   }
 
+  function handleDelete() {
+    if (!confirm("Энэ бичлэгийг бүрмөсөн устгах уу?")) return;
+    setActionError(null);
+    startTransition(async () => {
+      const res = await deleteVideoInline(video.id);
+      if (!res.ok) setActionError(res.error ?? "Алдаа гарлаа");
+      else router.refresh();
+    });
+  }
+
   return (
     <div className="rounded-lg ring-1 ring-white/5">
       <div className="flex items-center gap-4 p-2">
@@ -84,9 +99,17 @@ export default function UnmatchedRow({
           </a>
           <button
             onClick={() => (expanded ? setExpanded(false) : expand())}
-            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-black transition hover:brightness-110"
+            disabled={isPending}
+            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-black transition hover:brightness-110 disabled:opacity-50"
           >
             {expanded ? "Хаах" : "Холбох"}
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isPending}
+            className="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Устгах
           </button>
         </div>
       </div>

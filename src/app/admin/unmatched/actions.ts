@@ -53,3 +53,18 @@ export async function ignoreVideoInline(videoId: string): Promise<{ ok: boolean;
   revalidatePath("/admin/unmatched");
   return { ok: true };
 }
+
+/**
+ * Hard-deletes a video row. Unlike ignoreVideoInline, this doesn't leave a
+ * record behind - if the video is still live on YouTube, the next
+ * `npm run ingest` will re-add it and re-attempt auto-matching.
+ */
+export async function deleteVideoInline(videoId: string): Promise<{ ok: boolean; error?: string }> {
+  const db = getDb();
+  const { error } = await db.from("videos").delete().eq("id", videoId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin/unmatched");
+  revalidatePath("/admin");
+  return { ok: true };
+}
