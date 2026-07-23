@@ -14,8 +14,8 @@ export default function Sidebar({
   counts: Record<number, number>;
 }) {
   return (
-    <nav aria-label="Жанраар хайх">
-      <h2 className="text-sm font-semibold text-muted">Жанр</h2>
+    <nav aria-label="Төрлөөр хайх">
+      <h2 className="text-sm font-semibold text-muted">Төрөл</h2>
       <ul className="mt-3 flex flex-wrap gap-2 md:flex-col md:flex-nowrap md:gap-1">
         {genres.map((g) => (
           <li key={g.id} className="md:w-full">

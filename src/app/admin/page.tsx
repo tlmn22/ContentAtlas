@@ -92,6 +92,9 @@ export default async function AdminPage({ searchParams }: Props) {
         <Link href="/admin/movies" className="text-sm text-accent hover:underline">
           Бүх кино удирдах (дахин холбох / устгах) →
         </Link>
+        <Link href="/admin/tv-shows" className="text-sm text-accent hover:underline">
+          Бүх ТВ цуврал удирдах (дахин холбох / устгах) →
+        </Link>
       </div>
 
       <h2 className="mt-10 text-lg font-bold">Манай сайтаас хамгийн их тоглогдсон 10 кино</h2>

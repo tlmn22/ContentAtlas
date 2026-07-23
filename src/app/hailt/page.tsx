@@ -8,7 +8,7 @@ interface Props {
 
 export const metadata: Metadata = {
   title: "Хайлт",
-  description: "Кино нэр, жанр, оноор хайх.",
+  description: "Кино нэр, төрөл, оноор хайх.",
 };
 
 export default async function SearchPage({ searchParams }: Props) {

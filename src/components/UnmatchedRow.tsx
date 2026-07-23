@@ -4,14 +4,27 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { formatDate, formatViews } from "@/lib/format";
-import { posterUrl, releaseYear, type TmdbMovie } from "@/lib/tmdb";
+import { firstAirYear, posterUrl, releaseYear } from "@/lib/tmdb";
 import { VideoWithChannel } from "@/lib/types";
 import {
   deleteVideoInline,
   ignoreVideoInline,
   linkVideoInline,
+  linkVideoToTvShowInline,
   searchTmdbForVideo,
+  searchTmdbTvForVideo,
 } from "@/app/admin/unmatched/actions";
+
+type ContentType = "movie" | "tv";
+
+interface SearchResultItem {
+  id: number;
+  title: string;
+  originalTitle: string;
+  year: number | null;
+  poster_path: string | null;
+  vote_average: number;
+}
 
 export default function UnmatchedRow({
   video,
@@ -26,30 +39,65 @@ export default function UnmatchedRow({
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [contentType, setContentType] = useState<ContentType>("movie");
   const [query, setQuery] = useState(initialQuery);
-  const [results, setResults] = useState<TmdbMovie[] | null>(null);
+  const [results, setResults] = useState<SearchResultItem[] | null>(null);
   const [searched, setSearched] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function runSearch(q: string) {
+  function runSearch(q: string, type: ContentType) {
     setActionError(null);
     startTransition(async () => {
-      const r = await searchTmdbForVideo(q, initialYear ?? undefined);
-      setResults(r);
+      if (type === "movie") {
+        const r = await searchTmdbForVideo(q, initialYear ?? undefined);
+        setResults(
+          r.map((m) => ({
+            id: m.id,
+            title: m.title,
+            originalTitle: m.original_title,
+            year: releaseYear(m),
+            poster_path: m.poster_path,
+            vote_average: m.vote_average,
+          }))
+        );
+      } else {
+        const r = await searchTmdbTvForVideo(q, initialYear ?? undefined);
+        setResults(
+          r.map((s) => ({
+            id: s.id,
+            title: s.name,
+            originalTitle: s.original_name,
+            year: firstAirYear(s),
+            poster_path: s.poster_path,
+            vote_average: s.vote_average,
+          }))
+        );
+      }
       setSearched(true);
     });
   }
 
   function expand() {
     setExpanded(true);
-    if (!searched) runSearch(query);
+    if (!searched) runSearch(query, contentType);
+  }
+
+  function switchType(type: ContentType) {
+    if (type === contentType) return;
+    setContentType(type);
+    setSearched(false);
+    setResults(null);
+    runSearch(query, type);
   }
 
   function handleLink(tmdbId: number) {
     setActionError(null);
     startTransition(async () => {
-      const res = await linkVideoInline(video.id, tmdbId, initialTitleMn);
+      const res =
+        contentType === "movie"
+          ? await linkVideoInline(video.id, tmdbId, initialTitleMn)
+          : await linkVideoToTvShowInline(video.id, tmdbId, initialTitleMn);
       if (!res.ok) setActionError(res.error ?? "Алдаа гарлаа");
       else router.refresh();
     });
@@ -119,17 +167,37 @@ export default function UnmatchedRow({
           {actionError && (
             <p className="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">{actionError}</p>
           )}
-          <div className="flex flex-wrap gap-2">
+
+          <div className="flex gap-1 rounded-lg bg-surface p-1 text-xs">
+            <button
+              onClick={() => switchType("movie")}
+              className={`rounded px-3 py-1 transition ${
+                contentType === "movie" ? "bg-accent text-black" : "text-muted hover:text-foreground"
+              }`}
+            >
+              Кино
+            </button>
+            <button
+              onClick={() => switchType("tv")}
+              className={`rounded px-3 py-1 transition ${
+                contentType === "tv" ? "bg-accent text-black" : "text-muted hover:text-foreground"
+              }`}
+            >
+              ТВ цуврал
+            </button>
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-2">
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && runSearch(query)}
+              onKeyDown={(e) => e.key === "Enter" && runSearch(query, contentType)}
               placeholder="TMDB-ээс хайх (англи нэр дээр сайн ажиллана)"
               className="w-72 rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-accent/60"
             />
             <button
-              onClick={() => runSearch(query)}
+              onClick={() => runSearch(query, contentType)}
               disabled={isPending}
               className="rounded-lg border border-white/10 px-4 py-2 text-sm text-muted transition hover:text-foreground disabled:opacity-50"
             >
@@ -169,11 +237,11 @@ export default function UnmatchedRow({
                     <p className="text-sm font-semibold">
                       {m.title}{" "}
                       <span className="font-normal text-muted">
-                        {releaseYear(m) ?? "?"} · ★ {m.vote_average?.toFixed(1) ?? "-"}
+                        {m.year ?? "?"} · ★ {m.vote_average?.toFixed(1) ?? "-"}
                       </span>
                     </p>
-                    {m.original_title !== m.title && (
-                      <p className="text-xs text-muted">{m.original_title}</p>
+                    {m.originalTitle !== m.title && (
+                      <p className="text-xs text-muted">{m.originalTitle}</p>
                     )}
                   </div>
                   <button

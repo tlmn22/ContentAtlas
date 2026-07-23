@@ -1,5 +1,5 @@
 import { getDb } from "./supabase";
-import { Channel, Genre, Movie, MovieWithGenres, Video, VideoWithChannel } from "./types";
+import { Channel, Genre, Movie, MovieWithGenres, TvShow, TvShowWithGenres, Video, VideoWithChannel } from "./types";
 
 export type MovieCardChannel = Pick<Channel, "id" | "title" | "avatar_url">;
 
@@ -10,31 +10,40 @@ export type MovieCardData = Pick<
 
 const MOVIE_CARD_COLS = "id, slug, title, title_mn, year, poster_path, vote_average";
 
-/** Batch-attaches the distinct channels that uploaded a recap for each movie (card badges). */
+export type TvShowCardData = Pick<
+  TvShow,
+  "id" | "slug" | "title" | "title_mn" | "year" | "poster_path" | "vote_average"
+> & { channels: MovieCardChannel[] };
+
+const TV_SHOW_CARD_COLS = "id, slug, title, title_mn, year, poster_path, vote_average";
+
+/** Batch-attaches the distinct channels that uploaded a recap for each movie/show (card badges). */
 async function attachChannels<T extends { id: number }>(
-  movies: T[]
+  items: T[],
+  column: "movie_id" | "tv_show_id" = "movie_id"
 ): Promise<(T & { channels: MovieCardChannel[] })[]> {
-  if (movies.length === 0) return [];
+  if (items.length === 0) return [];
   const db = getDb();
   const { data, error } = await db
     .from("videos")
-    .select("movie_id, channels(id, title, avatar_url)")
+    .select(`${column}, channels(id, title, avatar_url)`)
     .in(
-      "movie_id",
-      movies.map((m) => m.id)
+      column,
+      items.map((m) => m.id)
     )
     .eq("is_available", true);
   if (error) throw error;
 
-  const channelsByMovie = new Map<number, Map<string, MovieCardChannel>>();
+  const channelsByItem = new Map<number, Map<string, MovieCardChannel>>();
   for (const row of data ?? []) {
     const channel = row.channels as unknown as MovieCardChannel | null;
-    if (!channel || row.movie_id === null) continue;
-    if (!channelsByMovie.has(row.movie_id)) channelsByMovie.set(row.movie_id, new Map());
-    channelsByMovie.get(row.movie_id)!.set(channel.id, channel);
+    const itemId = row[column as keyof typeof row] as unknown as number | null;
+    if (!channel || itemId === null) continue;
+    if (!channelsByItem.has(itemId)) channelsByItem.set(itemId, new Map());
+    channelsByItem.get(itemId)!.set(channel.id, channel);
   }
 
-  return movies.map((m) => ({ ...m, channels: Array.from(channelsByMovie.get(m.id)?.values() ?? []) }));
+  return items.map((m) => ({ ...m, channels: Array.from(channelsByItem.get(m.id)?.values() ?? []) }));
 }
 
 export type TopPlayedMovie = Omit<MovieCardData, "channels"> & { play_count: number };
@@ -248,6 +257,52 @@ export async function getAllMoviesForAdmin(limit = 1000): Promise<AdminMovieRow[
   return baseMovies.map((m) => ({ ...m, videos: videosByMovie.get(m.id) ?? [] }));
 }
 
+export type AdminTvShowRow = Omit<TvShowCardData, "channels"> & { videos: AdminMovieVideo[] };
+
+/** Same as getAllMoviesForAdmin but for TV shows. */
+export async function getAllTvShowsForAdmin(limit = 1000): Promise<AdminTvShowRow[]> {
+  const db = getDb();
+  const { data: shows, error } = await db
+    .from("tv_shows")
+    .select(`${TV_SHOW_CARD_COLS}, videos!inner(id)`)
+    .eq("videos.is_available", true)
+    .order("year", { ascending: false, nullsFirst: false })
+    .order("title", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+
+  const baseShows = (shows ?? []) as unknown as Omit<TvShowCardData, "channels">[];
+  if (baseShows.length === 0) return [];
+
+  const { data: videoRows, error: vErr } = await db
+    .from("videos")
+    .select("id, title, thumbnail_url, view_count, tv_show_id, channels(id, title, avatar_url)")
+    .in(
+      "tv_show_id",
+      baseShows.map((s) => s.id)
+    )
+    .eq("is_available", true)
+    .order("view_count", { ascending: false, nullsFirst: false });
+  if (vErr) throw vErr;
+
+  const videosByShow = new Map<number, AdminMovieVideo[]>();
+  for (const row of videoRows ?? []) {
+    if (row.tv_show_id === null) continue;
+    const channel = row.channels as unknown as MovieCardChannel | null;
+    if (!channel) continue;
+    if (!videosByShow.has(row.tv_show_id)) videosByShow.set(row.tv_show_id, []);
+    videosByShow.get(row.tv_show_id)!.push({
+      id: row.id,
+      title: row.title,
+      thumbnail_url: row.thumbnail_url,
+      view_count: row.view_count,
+      channel,
+    });
+  }
+
+  return baseShows.map((s) => ({ ...s, videos: videosByShow.get(s.id) ?? [] }));
+}
+
 export async function getGenres(): Promise<Genre[]> {
   const db = getDb();
   const { data, error } = await db.from("genres").select("*").order("name_mn");
@@ -300,11 +355,77 @@ export async function getMovieBySlug(
   };
 }
 
-export async function getChannelWithVideos(
-  channelId: string
-): Promise<{
+export async function getTvShowBySlug(
+  slug: string
+): Promise<(TvShowWithGenres & { videos: VideoWithChannel[] }) | null> {
+  const db = getDb();
+  const { data: show, error } = await db
+    .from("tv_shows")
+    .select("*, tv_show_genres(genres(*))")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) throw error;
+  if (!show) return null;
+
+  const { data: videos, error: vErr } = await db
+    .from("videos")
+    .select("*, channels(id, title, avatar_url)")
+    .eq("tv_show_id", show.id)
+    .eq("is_available", true)
+    .order("view_count", { ascending: false, nullsFirst: false });
+  if (vErr) throw vErr;
+
+  return {
+    ...(show as unknown as TvShowWithGenres),
+    videos: (videos ?? []) as unknown as VideoWithChannel[],
+  };
+}
+
+/** Latest matched TV shows, deduplicated (newest first). */
+export async function getLatestTvShows(limit = 12): Promise<TvShowCardData[]> {
+  const db = getDb();
+  const { data, error } = await db
+    .from("videos")
+    .select(`tv_show_id, published_at, tv_shows(${TV_SHOW_CARD_COLS})`)
+    .eq("is_available", true)
+    .not("tv_show_id", "is", null)
+    .order("published_at", { ascending: false })
+    .limit(limit * 3);
+  if (error) throw error;
+
+  const seen = new Set<number>();
+  const shows: Omit<TvShowCardData, "channels">[] = [];
+  for (const row of data ?? []) {
+    const show = row.tv_shows as unknown as Omit<TvShowCardData, "channels"> | null;
+    if (show && !seen.has(show.id)) {
+      seen.add(show.id);
+      shows.push(show);
+      if (shows.length >= limit) break;
+    }
+  }
+  return attachChannels(shows, "tv_show_id");
+}
+
+/** Every TV show with at least one available video, for the /tv listing. */
+export async function getAllTvShows(limit = 1000): Promise<TvShowCardData[]> {
+  const db = getDb();
+  const { data, error } = await db
+    .from("tv_shows")
+    .select(`${TV_SHOW_CARD_COLS}, videos!inner(id)`)
+    .eq("videos.is_available", true)
+    .order("year", { ascending: false, nullsFirst: false })
+    .order("title", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return attachChannels((data ?? []) as unknown as Omit<TvShowCardData, "channels">[], "tv_show_id");
+}
+
+export async function getChannelWithVideos(channelId: string): Promise<{
   channel: Channel;
-  videos: (Video & { movies: Omit<MovieCardData, "channels"> | null })[];
+  videos: (Video & {
+    movies: Omit<MovieCardData, "channels"> | null;
+    tv_shows: Omit<TvShowCardData, "channels"> | null;
+  })[];
 } | null> {
   const db = getDb();
   const { data: channel, error } = await db
@@ -317,7 +438,7 @@ export async function getChannelWithVideos(
 
   const { data: videos, error: vErr } = await db
     .from("videos")
-    .select(`*, movies(${MOVIE_CARD_COLS})`)
+    .select(`*, movies(${MOVIE_CARD_COLS}), tv_shows(${TV_SHOW_CARD_COLS})`)
     .eq("channel_id", channelId)
     .eq("is_available", true)
     .order("view_count", { ascending: false, nullsFirst: false })
@@ -326,7 +447,10 @@ export async function getChannelWithVideos(
 
   return {
     channel: channel as Channel,
-    videos: (videos ?? []) as unknown as (Video & { movies: Omit<MovieCardData, "channels"> | null })[],
+    videos: (videos ?? []) as unknown as (Video & {
+      movies: Omit<MovieCardData, "channels"> | null;
+      tv_shows: Omit<TvShowCardData, "channels"> | null;
+    })[],
   };
 }
 

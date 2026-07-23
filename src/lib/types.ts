@@ -33,6 +33,27 @@ export interface Movie {
   created_at: string;
 }
 
+export interface TvShow {
+  id: number;
+  tmdb_id: number;
+  slug: string;
+  title: string;
+  original_title: string | null;
+  title_mn: string | null;
+  year: number | null;
+  overview: string | null;
+  overview_mn: string | null;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  vote_average: number | null;
+  vote_count: number | null;
+  number_of_seasons: number | null;
+  number_of_episodes: number | null;
+  status: string | null;
+  tagline: string | null;
+  created_at: string;
+}
+
 export interface Genre {
   id: number;
   name: string;
@@ -48,6 +69,7 @@ export interface Video {
   duration_seconds: number | null;
   view_count: number | null;
   movie_id: number | null;
+  tv_show_id: number | null;
   match_status: MatchStatus;
   matched_by: string | null;
   is_available: boolean;
@@ -58,3 +80,4 @@ export interface Video {
 export type VideoWithChannel = Video & { channels: Pick<Channel, "id" | "title" | "avatar_url"> };
 export type VideoWithMovie = Video & { movies: Movie | null };
 export type MovieWithGenres = Movie & { movie_genres: { genres: Genre }[] };
+export type TvShowWithGenres = TvShow & { tv_show_genres: { genres: Genre }[] };

@@ -88,3 +88,56 @@ export async function getMovieById(tmdbId: number): Promise<TmdbMovie | null> {
     throw err;
   }
 }
+
+export interface TmdbTvShow {
+  id: number;
+  name: string;
+  original_name: string;
+  first_air_date: string; // "2011-04-17" or ""
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  vote_average: number;
+  popularity: number;
+  genre_ids: number[];
+  // Only present when fetched via getTvShowById (/tv/{id}) - /search/tv
+  // doesn't return these, same "undefined vs null" distinction as TmdbMovie.
+  vote_count?: number;
+  number_of_seasons?: number;
+  number_of_episodes?: number;
+  status?: string;
+  tagline?: string;
+}
+
+export async function searchTvShow(query: string, year?: number): Promise<TmdbTvShow[]> {
+  const params: Record<string, string> = {
+    query,
+    language: "en-US",
+    include_adult: "false",
+    page: "1",
+  };
+  if (year) params.first_air_date_year = String(year);
+
+  const data = await tmdb<{ results: TmdbTvShow[] }>("/search/tv", params);
+  return data.results ?? [];
+}
+
+export function firstAirYear(s: TmdbTvShow): number | null {
+  const y = s.first_air_date?.slice(0, 4);
+  return y && /^\d{4}$/.test(y) ? Number(y) : null;
+}
+
+interface TmdbTvShowDetails extends Omit<TmdbTvShow, "genre_ids"> {
+  genres: { id: number; name: string }[];
+}
+
+/** Fetch one TV show by id (used when an admin links a video manually). */
+export async function getTvShowById(tmdbId: number): Promise<TmdbTvShow | null> {
+  try {
+    const s = await tmdb<TmdbTvShowDetails>(`/tv/${tmdbId}`, { language: "en-US" });
+    return { ...s, genre_ids: (s.genres ?? []).map((g) => g.id) };
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("(404)")) return null;
+    throw err;
+  }
+}

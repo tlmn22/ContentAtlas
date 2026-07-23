@@ -1,6 +1,14 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeForCompare, parseVideoTitle } from "./title-parser";
-import { getMovieById, releaseYear, searchMovie, TmdbMovie } from "./tmdb";
+import {
+  firstAirYear,
+  getMovieById,
+  getTvShowById,
+  releaseYear,
+  searchMovie,
+  TmdbMovie,
+  TmdbTvShow,
+} from "./tmdb";
 
 export interface MatchResult {
   movie: TmdbMovie;
@@ -148,6 +156,75 @@ export async function ensureMovie(
     const { data: known } = await db.from("genres").select("id").in("id", details.genre_ids);
     const rows = (known ?? []).map((g) => ({ movie_id: inserted.id, genre_id: g.id }));
     if (rows.length) await db.from("movie_genres").upsert(rows);
+  }
+
+  return inserted.id;
+}
+
+/**
+ * Insert the TMDB TV show (and its genre links) if it doesn't exist yet.
+ * Returns the local tv_shows.id. Mirrors ensureMovie.
+ */
+export async function ensureTvShow(
+  db: SupabaseClient,
+  tmdbShow: TmdbTvShow,
+  titleMn: string | null
+): Promise<number> {
+  const { data: existing, error: selErr } = await db
+    .from("tv_shows")
+    .select("id, title_mn")
+    .eq("tmdb_id", tmdbShow.id)
+    .maybeSingle();
+  if (selErr) throw selErr;
+
+  if (existing) {
+    if (titleMn && !existing.title_mn) {
+      await db.from("tv_shows").update({ title_mn: titleMn }).eq("id", existing.id);
+    }
+    return existing.id;
+  }
+
+  // /search/tv (auto-match path) lacks number_of_seasons/status/tagline -
+  // fetch full /tv/{id} details once so every row we insert is complete.
+  let details = tmdbShow;
+  if (tmdbShow.number_of_seasons === undefined) {
+    const full = await getTvShowById(tmdbShow.id);
+    if (full) details = full;
+  }
+
+  const year = firstAirYear(details);
+  let slug = slugify(details.name, year);
+
+  const { data: slugTaken } = await db.from("tv_shows").select("id").eq("slug", slug).maybeSingle();
+  if (slugTaken) slug = `${slug}-${details.id}`;
+
+  const { data: inserted, error: insErr } = await db
+    .from("tv_shows")
+    .insert({
+      tmdb_id: details.id,
+      slug,
+      title: details.name,
+      original_title: details.original_name,
+      title_mn: titleMn,
+      year,
+      overview: details.overview || null,
+      poster_path: details.poster_path,
+      backdrop_path: details.backdrop_path,
+      vote_average: details.vote_average || null,
+      vote_count: details.vote_count ?? null,
+      number_of_seasons: details.number_of_seasons ?? null,
+      number_of_episodes: details.number_of_episodes ?? null,
+      status: details.status ?? null,
+      tagline: details.tagline || null,
+    })
+    .select("id")
+    .single();
+  if (insErr) throw insErr;
+
+  if (details.genre_ids?.length) {
+    const { data: known } = await db.from("genres").select("id").in("id", details.genre_ids);
+    const rows = (known ?? []).map((g) => ({ tv_show_id: inserted.id, genre_id: g.id }));
+    if (rows.length) await db.from("tv_show_genres").upsert(rows);
   }
 
   return inserted.id;

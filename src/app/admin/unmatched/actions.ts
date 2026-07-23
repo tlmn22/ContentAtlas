@@ -3,9 +3,9 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { ADMIN_SESSION_COOKIE, verifySessionToken } from "@/lib/admin-auth";
-import { ensureMovie } from "@/lib/matcher";
+import { ensureMovie, ensureTvShow } from "@/lib/matcher";
 import { getDb } from "@/lib/supabase";
-import { getMovieById, searchMovie, TmdbMovie } from "@/lib/tmdb";
+import { getMovieById, getTvShowById, searchMovie, searchTvShow, TmdbMovie, TmdbTvShow } from "@/lib/tmdb";
 
 /** Plain data-returning search, safe to call from a client component inline in the list. */
 export async function searchTmdbForVideo(query: string, year?: number): Promise<TmdbMovie[]> {
@@ -13,6 +13,15 @@ export async function searchTmdbForVideo(query: string, year?: number): Promise<
   if (!trimmed) return [];
   let results = await searchMovie(trimmed, year);
   if (results.length === 0 && year) results = await searchMovie(trimmed);
+  return results;
+}
+
+/** Same as searchTmdbForVideo but against TMDB's TV database. */
+export async function searchTmdbTvForVideo(query: string, year?: number): Promise<TmdbTvShow[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  let results = await searchTvShow(trimmed, year);
+  if (results.length === 0 && year) results = await searchTvShow(trimmed);
   return results;
 }
 
@@ -35,7 +44,31 @@ export async function linkVideoInline(
   const matchedBy = await currentAdminUsername();
   const { error } = await db
     .from("videos")
-    .update({ movie_id: movieDbId, match_status: "manual", matched_by: matchedBy })
+    .update({ movie_id: movieDbId, tv_show_id: null, match_status: "manual", matched_by: matchedBy })
+    .eq("id", videoId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin/unmatched");
+  revalidatePath("/admin/movies");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/** Same as linkVideoInline but for TV shows. */
+export async function linkVideoToTvShowInline(
+  videoId: string,
+  tmdbId: number,
+  titleMn: string | null
+): Promise<{ ok: boolean; error?: string }> {
+  const show = await getTvShowById(tmdbId);
+  if (!show) return { ok: false, error: "TMDB цуврал олдсонгүй" };
+
+  const db = getDb();
+  const showDbId = await ensureTvShow(db, show, titleMn);
+  const matchedBy = await currentAdminUsername();
+  const { error } = await db
+    .from("videos")
+    .update({ tv_show_id: showDbId, movie_id: null, match_status: "manual", matched_by: matchedBy })
     .eq("id", videoId);
   if (error) return { ok: false, error: error.message };
 

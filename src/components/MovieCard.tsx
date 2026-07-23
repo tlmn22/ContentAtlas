@@ -3,13 +3,19 @@ import Link from "next/link";
 import { MovieCardData } from "@/lib/queries";
 import { posterUrl } from "@/lib/tmdb";
 
-export default function MovieCard({ movie }: { movie: MovieCardData }) {
+export default function MovieCard({
+  movie,
+  hrefPrefix = "/kino",
+}: {
+  movie: MovieCardData;
+  hrefPrefix?: string;
+}) {
   const poster = posterUrl(movie.poster_path);
   const displayTitle = movie.title_mn ?? movie.title;
 
   return (
     <Link
-      href={`/kino/${movie.slug}`}
+      href={`${hrefPrefix}/${movie.slug}`}
       className="group block w-36 shrink-0 sm:w-44"
       title={displayTitle}
     >

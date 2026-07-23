@@ -49,6 +49,7 @@ export default async function AdminChannelPage({ params }: Props) {
                 key={v.id}
                 video={v}
                 movie={v.movies}
+                tvShow={v.tv_shows}
                 initialQuery={parsed.queries[0] ?? ""}
                 initialYear={parsed.year}
                 initialTitleMn={parsed.titleMn}

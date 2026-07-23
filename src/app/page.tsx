@@ -8,6 +8,7 @@ import {
   getGenreMovieCounts,
   getGenres,
   getLatestMovies,
+  getLatestTvShows,
   getMoviesByGenre,
   getPopularMovies,
   getTopRatedMovies,
@@ -22,17 +23,18 @@ async function loadHome() {
   const homeGenres = HOME_GENRE_IDS.map((id) => genres.find((g) => g.id === id)).filter(
     (g) => g !== undefined
   );
-  const [channels, genreCounts, latest, popular, topRated, genreRows] = await Promise.all([
+  const [channels, genreCounts, latest, popular, topRated, tvShows, genreRows] = await Promise.all([
     getActiveChannels(),
     getGenreMovieCounts(),
     getLatestMovies(15),
     getPopularMovies(15),
     getTopRatedMovies(15),
+    getLatestTvShows(15),
     Promise.all(
       homeGenres.map((g) => getMoviesByGenre(g.id, 15).then((movies) => ({ genre: g, movies })))
     ),
   ]);
-  return { genres, channels, genreCounts, latest, popular, topRated, genreRows };
+  return { genres, channels, genreCounts, latest, popular, topRated, tvShows, genreRows };
 }
 
 export default async function HomePage() {
@@ -51,7 +53,7 @@ export default async function HomePage() {
     );
   }
 
-  const { genres, channels, genreCounts, latest, popular, topRated, genreRows } = data;
+  const { genres, channels, genreCounts, latest, popular, topRated, tvShows, genreRows } = data;
   const isEmpty = latest.length === 0 && popular.length === 0;
 
   return (
@@ -110,6 +112,11 @@ export default async function HomePage() {
               {topRated.length > 0 && (
                 <Section title="Өндөр үнэлгээтэй">
                   <MovieRow movies={topRated} />
+                </Section>
+              )}
+              {tvShows.length > 0 && (
+                <Section title="ТВ цуврал" href="/tv">
+                  <MovieRow movies={tvShows} hrefPrefix="/tv" />
                 </Section>
               )}
               {genreRows.map(
