@@ -40,6 +40,39 @@ export async function deleteMovie(movieId: number): Promise<{ ok: boolean; error
   return { ok: true };
 }
 
+/**
+ * Manually sets (or clears) a movie's poster image, for the cases where
+ * TMDB simply has no poster on file. Accepts any absolute image URL, not
+ * just TMDB paths - see posterUrl() in lib/tmdb.ts for how that's resolved
+ * on render. Pass an empty string to clear back to "no poster".
+ */
+export async function updateMoviePoster(
+  movieId: number,
+  posterUrl: string
+): Promise<{ ok: boolean; error?: string }> {
+  const trimmed = posterUrl.trim();
+  if (trimmed && !/^https:\/\/.+/.test(trimmed)) {
+    return { ok: false, error: "Зурагны URL https:// -ээр эхэлсэн байх ёстой" };
+  }
+
+  const db = getDb();
+  const { data, error } = await db
+    .from("movies")
+    .update({ poster_path: trimmed || null })
+    .eq("id", movieId)
+    .select("slug")
+    .single();
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin/movies");
+  revalidatePath("/admin/top-views");
+  revalidatePath("/admin");
+  revalidatePath("/kino");
+  revalidatePath("/");
+  if (data?.slug) revalidatePath(`/kino/${data.slug}`);
+  return { ok: true };
+}
+
 /** Same as deleteMovie but for TV shows. */
 export async function deleteTvShow(tvShowId: number): Promise<{ ok: boolean; error?: string }> {
   const db = getDb();

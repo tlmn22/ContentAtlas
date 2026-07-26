@@ -7,7 +7,7 @@ import { useMemo, useState, useTransition } from "react";
 import AdminMovieVideoLine from "./AdminMovieVideoLine";
 import { AdminMovieRow } from "@/lib/queries";
 import { posterUrl } from "@/lib/tmdb";
-import { deleteMovie } from "@/app/admin/movies/actions";
+import { deleteMovie, updateMoviePoster } from "@/app/admin/movies/actions";
 
 type SortKey = "title" | "year" | "rating";
 
@@ -18,6 +18,9 @@ export default function AdminMovieTable({ movies }: { movies: AdminMovieRow[] })
   const [sortAsc, setSortAsc] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [posterEditId, setPosterEditId] = useState<number | null>(null);
+  const [posterInput, setPosterInput] = useState("");
+  const [posterError, setPosterError] = useState<string | null>(null);
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) setSortAsc((asc) => !asc);
@@ -59,6 +62,24 @@ export default function AdminMovieTable({ movies }: { movies: AdminMovieRow[] })
     });
   }
 
+  function openPosterEdit(movieId: number, currentPoster: string | null) {
+    setPosterError(null);
+    setPosterInput(currentPoster && currentPoster.startsWith("http") ? currentPoster : "");
+    setPosterEditId(movieId);
+  }
+
+  function handleSavePoster(movieId: number) {
+    setPosterError(null);
+    startTransition(async () => {
+      const res = await updateMoviePoster(movieId, posterInput);
+      if (!res.ok) setPosterError(res.error ?? "Алдаа гарлаа");
+      else {
+        setPosterEditId(null);
+        router.refresh();
+      }
+    });
+  }
+
   return (
     <div>
       <input
@@ -94,13 +115,25 @@ export default function AdminMovieTable({ movies }: { movies: AdminMovieRow[] })
             <div key={m.id} className="rounded-xl p-3 ring-1 ring-white/5">
               <div className="flex items-start gap-3">
                 <span className="w-6 shrink-0 text-center text-sm font-bold text-muted">{i + 1}</span>
-                <Link href={`/kino/${m.slug}`} target="_blank" className="shrink-0">
-                  <span className="relative block h-24 w-16 overflow-hidden rounded bg-surface">
-                    {poster && (
-                      <Image src={poster} alt={name} fill sizes="64px" className="object-cover" />
-                    )}
-                  </span>
-                </Link>
+                <div className="shrink-0">
+                  <Link href={`/kino/${m.slug}`} target="_blank">
+                    <span className="relative block h-24 w-16 overflow-hidden rounded bg-surface">
+                      {poster ? (
+                        <Image src={poster} alt={name} fill sizes="64px" className="object-cover" />
+                      ) : (
+                        <span className="flex h-full items-center justify-center p-1 text-center text-[10px] text-muted">
+                          Зураггүй
+                        </span>
+                      )}
+                    </span>
+                  </Link>
+                  <button
+                    onClick={() => openPosterEdit(m.id, m.poster_path)}
+                    className="mt-1 block w-16 rounded border border-white/10 py-0.5 text-center text-[10px] text-muted transition hover:text-foreground"
+                  >
+                    {poster ? "Зураг солих" : "Зураг нэмэх"}
+                  </button>
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
@@ -123,6 +156,33 @@ export default function AdminMovieTable({ movies }: { movies: AdminMovieRow[] })
                       Кино устгах
                     </button>
                   </div>
+
+                  {posterEditId === m.id && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-surface p-2">
+                      <input
+                        type="url"
+                        value={posterInput}
+                        onChange={(e) => setPosterInput(e.target.value)}
+                        placeholder="https://... зурагны URL (хоосон бол зураг арилна)"
+                        className="min-w-0 flex-1 rounded border border-white/10 bg-background px-2 py-1 text-xs outline-none placeholder:text-muted focus:border-accent/60"
+                      />
+                      <button
+                        onClick={() => handleSavePoster(m.id)}
+                        disabled={isPending}
+                        className="shrink-0 rounded bg-accent px-3 py-1 text-xs font-semibold text-black transition hover:brightness-110 disabled:opacity-50"
+                      >
+                        Хадгалах
+                      </button>
+                      <button
+                        onClick={() => setPosterEditId(null)}
+                        disabled={isPending}
+                        className="shrink-0 rounded border border-white/10 px-3 py-1 text-xs text-muted transition hover:text-foreground disabled:opacity-50"
+                      >
+                        Болих
+                      </button>
+                      {posterError && <p className="w-full text-xs text-red-400">{posterError}</p>}
+                    </div>
+                  )}
 
                   <div className="mt-2 flex flex-col gap-1.5">
                     {m.videos.map((v) => (

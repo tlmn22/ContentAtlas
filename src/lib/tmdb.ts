@@ -6,7 +6,11 @@ const API_BASE = "https://api.themoviedb.org/3";
 export const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
 export function posterUrl(path: string | null, size: "w342" | "w500" | "original" = "w342") {
-  return path ? `${TMDB_IMAGE_BASE}/${size}${path}` : null;
+  if (!path) return null;
+  // Admin-supplied posters (for movies TMDB has none for) are stored as
+  // full URLs in the same column - see updateMoviePoster in admin/movies/actions.ts.
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${TMDB_IMAGE_BASE}/${size}${path}`;
 }
 
 export function backdropUrl(path: string | null, size: "w780" | "w1280" = "w1280") {

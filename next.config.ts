@@ -3,10 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "image.tmdb.org" },
-      { protocol: "https", hostname: "i.ytimg.com" },
-      { protocol: "https", hostname: "yt3.ggpht.com" },
-      { protocol: "https", hostname: "yt3.googleusercontent.com" },
+      // Wildcard: admins can paste a poster URL from any host for movies
+      // TMDB has no poster for (see updateMoviePoster in admin/movies/actions.ts),
+      // on top of the known TMDB/YouTube hosts everything else uses.
+      { protocol: "https", hostname: "**" },
     ],
   },
 };
