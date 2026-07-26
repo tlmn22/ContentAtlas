@@ -114,7 +114,10 @@ export async function syncChannel(db: SupabaseClient, channel: Channel): Promise
 
   result.markedUnavailable = await sweepAvailability(db, channel.id);
 
-  await db.from("channels").update({ last_checked_at: new Date().toISOString() }).eq("id", channel.id);
+  await db
+    .from("channels")
+    .update({ last_checked_at: new Date().toISOString(), last_sync_new_videos: result.newVideos })
+    .eq("id", channel.id);
   return result;
 }
 

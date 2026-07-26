@@ -8,6 +8,7 @@ export interface Channel {
   uploads_playlist_id: string;
   is_active: boolean;
   last_checked_at: string | null;
+  last_sync_new_videos: number | null;
   created_at: string;
 }
 

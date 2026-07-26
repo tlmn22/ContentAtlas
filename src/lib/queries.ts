@@ -199,6 +199,54 @@ export async function getAllMoviesForTable(limit = 1000): Promise<MovieTableRow[
   }));
 }
 
+export type TopViewedMovieRow = Omit<MovieCardData, "channels"> & {
+  topViews: number | null;
+  topChannel: MovieCardChannel;
+};
+
+/**
+ * Every movie with an available video, ranked by its single highest-viewed
+ * recap (not summed across channels). Admin-only: /admin/top-views.
+ * Paginated past PostgREST's 1000-row cap so the ranking covers every video,
+ * not just the first page — see fetchAllRows in lib/ingest.ts for the same
+ * pattern.
+ */
+export async function getMoviesRankedByViews(): Promise<TopViewedMovieRow[]> {
+  const db = getDb();
+  const PAGE_SIZE = 1000;
+  type Row = {
+    movie_id: number | null;
+    view_count: number | null;
+    channels: MovieCardChannel | null;
+    movies: Omit<MovieCardData, "channels"> | null;
+  };
+  const rows: Row[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await db
+      .from("videos")
+      .select(`movie_id, view_count, channels(id, title, avatar_url), movies(${MOVIE_CARD_COLS})`)
+      .eq("is_available", true)
+      .not("movie_id", "is", null)
+      .order("view_count", { ascending: false, nullsFirst: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    rows.push(...(data as unknown as Row[]));
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  const seen = new Set<number>();
+  const result: TopViewedMovieRow[] = [];
+  for (const row of rows) {
+    if (row.movie_id === null || seen.has(row.movie_id) || !row.movies || !row.channels) continue;
+    seen.add(row.movie_id);
+    result.push({ ...row.movies, topViews: row.view_count, topChannel: row.channels });
+  }
+  return result;
+}
+
 export interface AdminMovieVideo {
   id: string;
   title: string;

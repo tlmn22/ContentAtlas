@@ -95,6 +95,9 @@ export default async function AdminPage({ searchParams }: Props) {
         <Link href="/admin/tv-shows" className="text-sm text-accent hover:underline">
           Бүх ТВ цуврал удирдах (дахин холбох / устгах) →
         </Link>
+        <Link href="/admin/top-views" className="text-sm text-accent hover:underline">
+          Бүх кино — хамгийн их үзэлттэйгээр →
+        </Link>
       </div>
 
       <h2 className="mt-10 text-lg font-bold">Манай сайтаас хамгийн их тоглогдсон 10 кино</h2>
@@ -201,7 +204,18 @@ export default async function AdminPage({ searchParams }: Props) {
                     )}
                   </td>
                   <td className="py-3 pr-4 text-muted">
-                    {c.last_checked_at ? new Date(c.last_checked_at).toLocaleString("mn-MN") : "—"}
+                    {c.last_checked_at ? (
+                      <>
+                        {new Date(c.last_checked_at).toLocaleString("mn-MN")}
+                        {c.last_sync_new_videos !== null && (
+                          <span className="ml-1 text-xs">
+                            ({c.last_sync_new_videos} шинэ)
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="py-3">
                     <div className="flex gap-2">
