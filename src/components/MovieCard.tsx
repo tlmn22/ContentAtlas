@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { formatViews } from "@/lib/format";
 import { MovieCardData } from "@/lib/queries";
 import { posterUrl } from "@/lib/tmdb";
 
@@ -69,6 +70,7 @@ export default function MovieCard({
       <p className="text-xs text-muted">
         {movie.title_mn ? `${movie.title} · ` : ""}
         {movie.year ?? ""}
+        {movie.topViews ? ` · ${formatViews(movie.topViews)}` : ""}
       </p>
     </Link>
   );

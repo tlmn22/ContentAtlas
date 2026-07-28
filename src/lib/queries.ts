@@ -6,7 +6,7 @@ export type MovieCardChannel = Pick<Channel, "id" | "title" | "avatar_url">;
 export type MovieCardData = Pick<
   Movie,
   "id" | "slug" | "title" | "title_mn" | "year" | "poster_path" | "vote_average"
-> & { channels: MovieCardChannel[] };
+> & { channels: MovieCardChannel[]; topViews?: number | null };
 
 const MOVIE_CARD_COLS = "id, slug, title, title_mn, year, poster_path, vote_average";
 
@@ -44,6 +44,32 @@ async function attachChannels<T extends { id: number }>(
   }
 
   return items.map((m) => ({ ...m, channels: Array.from(channelsByItem.get(m.id)?.values() ?? []) }));
+}
+
+/** Batch-attaches each movie's single highest available-video view count (not summed across channels). */
+async function attachTopViews<T extends { id: number }>(
+  items: T[]
+): Promise<(T & { topViews: number | null })[]> {
+  if (items.length === 0) return [];
+  const db = getDb();
+  const { data, error } = await db
+    .from("videos")
+    .select("movie_id, view_count")
+    .in(
+      "movie_id",
+      items.map((m) => m.id)
+    )
+    .eq("is_available", true)
+    .order("view_count", { ascending: false, nullsFirst: false });
+  if (error) throw error;
+
+  // Globally sorted desc, so the first row seen per movie is its max.
+  const topByMovie = new Map<number, number | null>();
+  for (const row of data ?? []) {
+    if (row.movie_id === null || topByMovie.has(row.movie_id)) continue;
+    topByMovie.set(row.movie_id, row.view_count);
+  }
+  return items.map((m) => ({ ...m, topViews: topByMovie.get(m.id) ?? null }));
 }
 
 export type TopPlayedMovie = Omit<MovieCardData, "channels"> & { play_count: number };
@@ -599,9 +625,13 @@ export async function searchMovies(params: MovieSearchParams): Promise<MovieCard
   if (params.year) query = query.eq("year", params.year);
   if (params.countryCode) query = query.contains("production_countries", [params.countryCode]);
 
-  const { data, error } = await query
-    .order("year", { ascending: false, nullsFirst: false })
-    .limit(params.limit ?? 60);
+  // Fetch a generous candidate set (results are re-ranked by view count below,
+  // which isn't a movies column, so it can't be pushed down into the query).
+  const { data, error } = await query.limit(500);
   if (error) throw error;
-  return attachChannels((data ?? []) as unknown as Omit<MovieCardData, "channels">[]);
+
+  const withChannels = await attachChannels((data ?? []) as unknown as Omit<MovieCardData, "channels">[]);
+  const withViews = await attachTopViews(withChannels);
+  withViews.sort((a, b) => (b.topViews ?? 0) - (a.topViews ?? 0));
+  return withViews.slice(0, params.limit ?? 60);
 }
