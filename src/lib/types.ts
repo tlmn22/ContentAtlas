@@ -31,6 +31,7 @@ export interface Movie {
   budget: number | null;
   revenue: number | null;
   tagline: string | null;
+  production_countries: string[] | null;
   created_at: string;
 }
 

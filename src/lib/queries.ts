@@ -147,6 +147,38 @@ export async function getMoviesByGenre(genreId: number, limit = 12): Promise<Mov
   return attachChannels((data ?? []) as unknown as Omit<MovieCardData, "channels">[]);
 }
 
+/** Movies produced in a given country (ISO 3166-1 code) with an available video. */
+export async function getMoviesByCountry(countryCode: string, limit = 12): Promise<MovieCardData[]> {
+  const db = getDb();
+  const { data, error } = await db
+    .from("movies")
+    .select(`${MOVIE_CARD_COLS}, videos!inner(id)`)
+    .contains("production_countries", [countryCode])
+    .eq("videos.is_available", true)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return attachChannels((data ?? []) as unknown as Omit<MovieCardData, "channels">[]);
+}
+
+/** Number of movies (with at least one available video) per country code. */
+export async function getCountryMovieCounts(): Promise<Record<string, number>> {
+  const db = getDb();
+  const { data, error } = await db
+    .from("movies")
+    .select("production_countries, videos!inner(id)")
+    .eq("videos.is_available", true);
+  if (error) throw error;
+
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    for (const code of row.production_countries ?? []) {
+      counts[code] = (counts[code] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
 export type MovieTableChannel = MovieCardChannel & { view_count: number };
 export type MovieTableRow = Omit<MovieCardData, "channels"> & { channels: MovieTableChannel[] };
 
@@ -543,6 +575,7 @@ export interface MovieSearchParams {
   q?: string;
   genreId?: number;
   year?: number;
+  countryCode?: string;
   limit?: number;
 }
 
@@ -564,6 +597,7 @@ export async function searchMovies(params: MovieSearchParams): Promise<MovieCard
   }
   if (params.genreId) query = query.eq("movie_genres.genre_id", params.genreId);
   if (params.year) query = query.eq("year", params.year);
+  if (params.countryCode) query = query.contains("production_countries", [params.countryCode]);
 
   const { data, error } = await query
     .order("year", { ascending: false, nullsFirst: false })

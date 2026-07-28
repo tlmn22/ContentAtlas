@@ -58,6 +58,7 @@ export interface TmdbMovie {
   budget?: number;
   revenue?: number;
   tagline?: string;
+  production_countries?: { iso_3166_1: string; name: string }[];
 }
 
 export async function searchMovie(query: string, year?: number): Promise<TmdbMovie[]> {

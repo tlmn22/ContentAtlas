@@ -250,3 +250,34 @@ export async function backfillMovieDetails(
   }
   return { updated, total: movies.length };
 }
+
+/**
+ * Backfills production_countries for movies inserted before that column
+ * existed. Safe to re-run - only targets rows where it's still null (a
+ * movie TMDB genuinely has no country data for ends up with `[]`, not
+ * null, so it won't be retried forever).
+ */
+export async function backfillMovieCountries(
+  db: SupabaseClient
+): Promise<{ updated: number; total: number }> {
+  const movies = await fetchAllRows<{ id: number; tmdb_id: number; title: string }>((from, to) =>
+    db.from("movies").select("id, tmdb_id, title").is("production_countries", null).range(from, to)
+  );
+
+  let updated = 0;
+  for (const m of movies) {
+    try {
+      const details = await getMovieById(m.tmdb_id);
+      const { error } = await db
+        .from("movies")
+        .update({ production_countries: (details?.production_countries ?? []).map((c) => c.iso_3166_1) })
+        .eq("id", m.id);
+      if (error) throw error;
+      updated++;
+    } catch (err) {
+      console.error(`Country backfill failed for movie ${m.id} "${m.title}":`, err);
+    }
+    await sleep(100);
+  }
+  return { updated, total: movies.length };
+}

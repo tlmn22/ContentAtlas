@@ -146,6 +146,7 @@ export async function ensureMovie(
       budget: details.budget || null,
       revenue: details.revenue || null,
       tagline: details.tagline || null,
+      production_countries: details.production_countries?.map((c) => c.iso_3166_1) ?? null,
     })
     .select("id")
     .single();

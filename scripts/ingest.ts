@@ -4,11 +4,18 @@
  *   npm run ingest -- UCxxxx             - sync a single channel by id
  *   npm run ingest -- --rematch          - retry TMDB matching for unmatched videos
  *   npm run ingest -- --backfill-details - fill in runtime/imdb_id/budget/... for movies missing them
+ *   npm run ingest -- --backfill-countries - fill in production_countries for movies missing it
  */
 import { config } from "dotenv";
 config({ path: ".env.local" });
 import { getDb } from "../src/lib/supabase";
-import { backfillMovieDetails, ingestAll, rematchUnmatched, syncChannel } from "../src/lib/ingest";
+import {
+  backfillMovieCountries,
+  backfillMovieDetails,
+  ingestAll,
+  rematchUnmatched,
+  syncChannel,
+} from "../src/lib/ingest";
 import { Channel } from "../src/lib/types";
 
 async function main() {
@@ -24,6 +31,12 @@ async function main() {
   if (arg === "--backfill-details") {
     const { updated, total } = await backfillMovieDetails(db);
     console.log(`Дэлгэрэнгүй мэдээлэл нөхөлт: ${updated}/${total} кино шинэчлэгдлээ.`);
+    return;
+  }
+
+  if (arg === "--backfill-countries") {
+    const { updated, total } = await backfillMovieCountries(db);
+    console.log(`Улсын мэдээлэл нөхөлт: ${updated}/${total} кино шинэчлэгдлээ.`);
     return;
   }
 

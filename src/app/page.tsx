@@ -3,12 +3,15 @@ import ChannelRow from "@/components/ChannelRow";
 import MovieRow from "@/components/MovieRow";
 import Section from "@/components/Section";
 import Sidebar from "@/components/Sidebar";
+import { COUNTRIES } from "@/lib/countries";
 import {
   getActiveChannels,
+  getCountryMovieCounts,
   getGenreMovieCounts,
   getGenres,
   getLatestMovies,
   getLatestTvShows,
+  getMoviesByCountry,
   getMoviesByGenre,
   getPopularMovies,
   getTopRatedMovies,
@@ -17,24 +20,44 @@ import {
 export const dynamic = "force-dynamic";
 
 const HOME_GENRE_IDS = [28, 35, 27, 18, 878, 10749];
+const HOME_COUNTRY_CODES = ["KR", "IN"];
 
 async function loadHome() {
   const genres = await getGenres();
   const homeGenres = HOME_GENRE_IDS.map((id) => genres.find((g) => g.id === id)).filter(
     (g) => g !== undefined
   );
-  const [channels, genreCounts, latest, popular, topRated, tvShows, genreRows] = await Promise.all([
-    getActiveChannels(),
-    getGenreMovieCounts(),
-    getLatestMovies(15),
-    getPopularMovies(15),
-    getTopRatedMovies(15),
-    getLatestTvShows(15),
-    Promise.all(
-      homeGenres.map((g) => getMoviesByGenre(g.id, 15).then((movies) => ({ genre: g, movies })))
-    ),
-  ]);
-  return { genres, channels, genreCounts, latest, popular, topRated, tvShows, genreRows };
+  const homeCountries = HOME_COUNTRY_CODES.map((code) => COUNTRIES.find((c) => c.code === code)).filter(
+    (c) => c !== undefined
+  );
+  const [channels, genreCounts, countryCounts, latest, popular, topRated, tvShows, genreRows, countryRows] =
+    await Promise.all([
+      getActiveChannels(),
+      getGenreMovieCounts(),
+      getCountryMovieCounts(),
+      getLatestMovies(15),
+      getPopularMovies(15),
+      getTopRatedMovies(15),
+      getLatestTvShows(15),
+      Promise.all(
+        homeGenres.map((g) => getMoviesByGenre(g.id, 15).then((movies) => ({ genre: g, movies })))
+      ),
+      Promise.all(
+        homeCountries.map((c) => getMoviesByCountry(c.code, 15).then((movies) => ({ country: c, movies })))
+      ),
+    ]);
+  return {
+    genres,
+    channels,
+    genreCounts,
+    countryCounts,
+    latest,
+    popular,
+    topRated,
+    tvShows,
+    genreRows,
+    countryRows,
+  };
 }
 
 export default async function HomePage() {
@@ -53,7 +76,8 @@ export default async function HomePage() {
     );
   }
 
-  const { genres, channels, genreCounts, latest, popular, topRated, tvShows, genreRows } = data;
+  const { genres, channels, genreCounts, countryCounts, latest, popular, topRated, tvShows, genreRows, countryRows } =
+    data;
   const isEmpty = latest.length === 0 && popular.length === 0;
 
   return (
@@ -76,7 +100,12 @@ export default async function HomePage() {
       <div className="mt-8 flex flex-col gap-8 md:flex-row md:items-start">
         {genres.length > 0 && (
           <aside className="order-2 md:order-1 md:w-48 md:shrink-0">
-            <Sidebar genres={genres} counts={genreCounts} />
+            <Sidebar
+              genres={genres}
+              counts={genreCounts}
+              countries={COUNTRIES}
+              countryCounts={countryCounts}
+            />
           </aside>
         )}
 
@@ -127,6 +156,19 @@ export default async function HomePage() {
                       title={genre.name_mn}
                       href={`/hailt?genre=${genre.id}`}
                       count={genreCounts[genre.id] ?? movies.length}
+                    >
+                      <MovieRow movies={movies} />
+                    </Section>
+                  )
+              )}
+              {countryRows.map(
+                ({ country, movies }) =>
+                  movies.length > 0 && (
+                    <Section
+                      key={country.code}
+                      title={`${country.name_mn} кино`}
+                      href={`/hailt?country=${country.code}`}
+                      count={countryCounts[country.code] ?? movies.length}
                     >
                       <MovieRow movies={movies} />
                     </Section>
