@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </p>
           <p className="mt-2">Кино мэдээлэл: TMDB · © {new Date().getFullYear()} KinoTailbar</p>
         </footer>
+        <Analytics />
       </body>
     </html>
   );
